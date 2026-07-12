@@ -9,7 +9,7 @@ import { openPreview } from './previewBridge.js';
 import { LivePreview } from './livePreview.js';
 import { exportPublishZip } from './exporter.js';
 import { openApiSearch } from './apiSearch.js';
-import { AUTO_SCALE_RANGE, effectiveScale } from './autoLayout.js';
+import { AUTO_SCALE_RANGE, effectiveScale, layoutRoom, layoutAll } from './autoLayout.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -200,6 +200,24 @@ function showPublishDialog() {
   });
 }
 
+// A5: 범용 확인 다이얼로그 (.ed-modal 재사용) — 확인 시 onOk 실행
+function confirmDialog(title, body, onOk) {
+  const pop = document.createElement('div');
+  pop.className = 'ed-modal';
+  pop.innerHTML = `
+    <div class="ed-card">
+      <div class="ed-title">${attr(title)}</div>
+      <div class="ed-body">${attr(body)}</div>
+      <div class="ed-actions">
+        <button class="tb-btn" data-m="cancel">취소</button>
+        <button class="tb-btn accent" data-m="ok">진행</button>
+      </div>
+    </div>`;
+  document.body.appendChild(pop);
+  pop.querySelector('[data-m=cancel]').addEventListener('click', () => pop.remove());
+  pop.querySelector('[data-m=ok]').addEventListener('click', () => { pop.remove(); onOk(); });
+}
+
 // P8-2: 재진입 시 자동 저장본 복구 확인 다이얼로그
 function showRestoreDialog() {
   const pop = document.createElement('div');
@@ -256,7 +274,10 @@ function renderRoomProps() {
     <div class="toggle-row"><label>이 방 개별 배율 (적용 ${effScale}x)</label><div class="switch ${hasAutoOverride ? 'on' : ''}" data-auto-override></div></div>
     ${hasAutoOverride ? `<div class="field"><label>이 방 배율 <b class="auto-room-lbl">${room.autoScale}x</b></label>
       <input type="range" data-auto-room min="${AUTO_SCALE_RANGE[0]}" max="${AUTO_SCALE_RANGE[1]}" step="0.1" value="${room.autoScale}"></div>` : ''}
-    <div class="hint-note">배율·크기는 자동 정렬 실행 시 작품에 적용됩니다 (A4).</div>`}
+    <div class="toggle-row"><label>방 크기 자동 조정</label><div class="switch ${store.project.autoLayout?.autoSizeRoom !== false ? 'on' : ''}" data-auto-size></div></div>
+    <div class="toggle-row"><label>직접 옮긴 작품 보호</label><div class="switch ${store.project.autoLayout?.protectManual !== false ? 'on' : ''}" data-auto-protect></div></div>
+    <button class="tb-btn accent" data-auto-run style="width:100%;margin-top:8px">✨ 이 방 자동 정렬 (${(room.artworks || []).length}점)</button>
+    <button class="tb-btn" data-auto-all style="width:100%;margin-top:6px;font-size:12px">전체 미술관 자동 배치</button>`}
     ${isLobby ? `
     <div class="panel-title" style="margin-top:14px">관람 설정</div>
     <div class="toggle-row"><label>방 이동 메뉴 허용 (M키·모바일 버튼)</label><div class="switch ${store.project.meta.allowTeleport !== false ? 'on' : ''}" data-allow-tp></div></div>` : ''}
@@ -297,6 +318,33 @@ function renderRoomProps() {
     const lbl = root.querySelector('.auto-room-lbl'); if (lbl) lbl.textContent = v + 'x';
   });
   root.querySelector('[data-auto-room]')?.addEventListener('change', () => store.breakCoalesce());
+  // A5: 방 크기 자동 조정 / 보호 토글 (전역)
+  root.querySelector('[data-auto-size]')?.addEventListener('click', () => {
+    store.mutate(p => { p.autoLayout.autoSizeRoom = p.autoLayout.autoSizeRoom === false; }, { detail: { silent: true }, noUndo: true });
+    renderRoomProps();
+  });
+  root.querySelector('[data-auto-protect]')?.addEventListener('click', () => {
+    store.mutate(p => { p.autoLayout.protectManual = p.autoLayout.protectManual === false; }, { detail: { silent: true }, noUndo: true });
+    renderRoomProps();
+  });
+  // A5.1: 이 방 자동 정렬
+  root.querySelector('[data-auto-run]')?.addEventListener('click', () => {
+    if (!(room.artworks || []).length) { toast('이 방에 배치할 작품이 없습니다.', true); return; }
+    const plan = layoutRoom(store, room.id, {});
+    const w = plan?.warnings || [];
+    toast(w.length ? w[0] : `자동 정렬 완료 (${plan?.count ?? 0}점).`, w.length > 0);
+  });
+  // A5.4: 전체 자동 배치 — 기존 배치가 있으면 확인 다이얼로그
+  root.querySelector('[data-auto-all]')?.addEventListener('click', () => {
+    const hasPlaced = store.project.rooms.some(r => (r.artworks || []).length);
+    const run = () => {
+      const plans = layoutAll(store, {});
+      const warns = plans.flatMap(p => p.warnings);
+      toast(warns.length ? warns[0] : '전체 자동 배치를 완료했습니다.', warns.length > 0);
+    };
+    if (hasPlaced) confirmDialog('전체 자동 배치', '모든 방의 작품 크기·위치·방 크기가 다시 계산됩니다. 직접 옮긴 작품은 보호 옵션이 켜져 있으면 유지됩니다. 진행할까요?', run);
+    else run();
+  });
   // P2(v1.4): 관람자 방 이동 허용 토글 (프로젝트 전역 — 로비 속성에 배치)
   root.querySelector('[data-allow-tp]')?.addEventListener('click', () => {
     store.mutate(p => { p.meta.allowTeleport = p.meta.allowTeleport === false; }, { detail: {} });

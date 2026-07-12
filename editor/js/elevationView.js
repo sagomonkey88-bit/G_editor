@@ -551,6 +551,7 @@ export class ElevationView {
     this.store.mutate(p => {
       const rr = this._roomRef(p); const aa = rr.artworks.find(x => x.id === id);
       aa.placement.x = +res.u.toFixed(2); aa.placement.centerHeightCm = Math.round(res.v * 100);
+      aa._manual = true; // A5: 직접 옮긴 작품 — 자동 정렬 보호 대상
     }, { detail: { silent: true }, coalesce: 'aw-move:' + id });
     this.render();
   }
@@ -568,6 +569,7 @@ export class ElevationView {
         aw: aa, others: this._others(id), door: this._door(), snap: false,
       });
       aa.placement.x = +res.u.toFixed(2); aa.placement.centerHeightCm = Math.round(res.v * 100);
+      aa._manual = true; // A5: 직접 크기 조정한 작품 — 자동 정렬 보호 대상
     }, { detail: { silent: true }, coalesce: 'aw-scale:' + id });
     const cur = this._findInRoom(id);
     this._setDimLabel(cur, artworkOuterSize(cur), cur.placement.x, cur.placement.centerHeightCm / 100, snapped);

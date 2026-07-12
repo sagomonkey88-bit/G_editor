@@ -33,9 +33,17 @@
 - [x] schema.js `reflowOrigins(project, start)`: 옵션1 — 사이징 후 exitDoor 체인 재배치(겹침 방지). layoutRoom 은 하류만(상류 고정), A5 "전체"는 start=0
 - [x] 라이브 검증: 6점→겹침 0(로비 침범 해소), 3방×10점→겹침·에러 0·upstream 고정·last-room 3벽 분배, 균등 간격 3.26m, undo 1스텝, 콘솔 클린
 - [x] A4 신규 스키마 필드 없음(origin/size/placement 기존) → 라운드트립 무영향
-## A5. 재배치와 되돌리기 (미착수)
+## A5. 재배치와 되돌리기 ✅ (커밋 완료)
+- [x] elevationView: 수동 이동/스케일 시 `aw._manual=true` (보호 대상 표시)
+- [x] autoLayout.js: computeRoomPlan 보호 분리(fixed=현재 벽 고정 장애물, movable만 분배·크기 굽기), applyRoomPlan(resolvePlacement 로 고정 회피), layoutRoom(하류만)/layoutAll(전체, start=0)
+- [x] exporter.js: `delete a._manual` (배포본 제외, 작업 zip 은 유지)
+- [x] app.js: "이 방 자동 정렬"·"전체 미술관 자동 배치" 버튼 + 방 크기 자동 조정/직접 옮긴 작품 보호 토글 + 기존 배치 확인 다이얼로그(confirmDialog)
+- [x] A3.4: "방 크기 자동 조정" 토글로 "크기 유지/재산정" 대체(persist)
+- [x] 라이브 검증: 보호 ON 고정·OFF 재배치, UI 버튼·토글, 전체 다이얼로그, undo 1스텝, 3방 겹침 0, publish `_manual` 제거·work zip 유지, 평면도 스크린샷 깔끔, 콘솔 클린
 
 ## 공통 (각 항목 완료 시)
-- [ ] 저장→재로드→내보내기 라운드트립
-- [ ] v1.4(텔레포트/평면도 인디케이터/캡션 meta) 회귀 없음
-- [ ] 항목 번호 포함 시맨틱 커밋
+- [x] 저장→재로드→내보내기 라운드트립 (autoLayout·autoScale·_manual 확인)
+- [x] v1.4(텔레포트/평면도 인디케이터/캡션 meta) 회귀 없음 — 로드·검증 클린
+- [x] 항목 번호 포함 시맨틱 커밋 (A1~A5)
+
+## PART A 완료. PART B 는 새 세션에서 이 문서만 다시 읽고 진행.

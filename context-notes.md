@@ -48,6 +48,14 @@
 - **결정 근거**: 자유배치에서 방들이 findFreeSpot 으로 맞닿아 배치돼 제자리 확대가 로비/이웃을 침범 → 사용자 승인 하에 옵션1(사이징 후 체인 재배치) 채택.
 - 라이브 검증: 6점 겹침 해소(room0 origin z=-11.82 남벽 z=0), 3방×10점 겹침·에러 0 + upstreamFixed(room1 배치 시 room0 origin 불변) + last-room 3벽(4/3/3) 분배, undo 1스텝, 콘솔 클린. 신규 스키마 없음.
 
+## A5 결정 (커밋 완료) — PART A 완료
+- **`_manual` 플래그**: elevationView `_applyMove`/`_applyScale` mutate 에서 `aa._manual=true`. exporter 에서 `delete a._manual`(배포 제외), 작업 zip 은 유지(보호 상태 재로드 후 생존). 인스펙터 속성 편집은 미표시(정면뷰 드래그만 = "직접 옮긴").
+- **보호 처리**: computeRoomPlan 이 protect(=autoLayout.protectManual, 기본 on) 시 `_manual` 작품을 fixed 로 분리 — 현재 벽에 고정(위치·크기 불변, 실측 외곽으로 방 크기 계산에 포함), movable 만 벽 분배·크기 굽기. applyRoomPlan 은 movable 배치 시 그 벽 fixed 를 others 로 resolvePlacement(겹침 회피, snap:false).
+- **함수 구조**: `applyRoomPlan(project, plan)`(순수 적용, reflow/mutate 없음) ← `layoutRoom`(mutate 1회: apply + reflow(idx) 하류만) / `layoutAll`(mutate 1회: 전 방 apply + reflow(0) 전체). 둘 다 undo 1스텝.
+- **UI**(app.js 룸 속성 자동배치 섹션): "이 방 자동 정렬"(작품 수 표시)·"전체 미술관 자동 배치" 버튼, "방 크기 자동 조정"(autoSizeRoom)·"직접 옮긴 작품 보호"(protectManual) 토글(noUndo 저장). 전체 배치는 기존 배치 있으면 confirmDialog. 경고는 toast.
+- **A3.4 해석**: per-run 다이얼로그 대신 "방 크기 자동 조정" 토글(persist)로 "크기 유지/재산정" 제공 — 가장 단순한 해석.
+- 라이브 검증: 보호 ON t2 고정(x1/h90/w50)·OFF 재배치(x9.17/h175/w224); UI 4컨트롤·버튼·토글; 전체 다이얼로그+undo 1스텝; 3방 겹침 0; publish `_manual` 제거·work zip 유지·publish autoLayout 무해 잔존; 평면도 스크린샷(로비→1→2→3 체인, 겹침 0) 확인.
+
 ## 범위
 - **P5(투어 모드)는 훅 포함 전체 제외** — 사용자 지시 "p5는 실행하지 않고 나머지만". 지시문상 v1.4 는 훅만 준비하라고 했으나, 사용자 지시를 보수적으로 해석해 tourMode 필드 예약·AvatarState 모듈화도 하지 않음.
 

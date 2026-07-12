@@ -33,6 +33,7 @@ export async function exportPublishZip(store, opts = {}) {
     delete a.docentNote;          // §4: 배포본에서 반드시 제거
     delete a._px;
     delete a._screen;
+    delete a._manual;             // A5(v1.5): 편집 전용 보호 플래그 — 배포본 제외
     const im = store.images.get(a.id);
     if (im) {
       const ext = im.blob.type.includes('webp') ? 'webp' : im.blob.type.includes('png') ? 'png' : 'jpg';
