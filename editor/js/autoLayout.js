@@ -2,6 +2,8 @@
 // A2 크기 규칙(높이 정규화 + 파노라마 예외) · A3 방 크기 산정 · A4 배치 알고리즘의 순수 함수.
 // 크기 모델 방안 A: 자동 배치는 작품 sizeCm 에 표시 크기를 굽고 scale=1.0 으로 기록한다
 // (shared resolveScale 상한을 건드리지 않기 위함). viewer 는 이 모듈을 쓰지 않는다(에디터 전용).
+import { RANGES } from '../../shared/schema.js';
+import { FRAME_STYLES, MATTE_BORDER } from '../../shared/placementRules.js';
 
 // 고정 캘리브레이션 상수 — 라이브 프리뷰로 실측 튜닝. 하드코딩 금지 원칙에 따라 한 곳에 모음.
 export const AUTO = Object.freeze({
@@ -44,4 +46,101 @@ export function normalizedSize(aw, effScale) {
   let hM = th, wM = th * aspect;
   if (aspect > AUTO.PANORAMA_RATIO) { wM = th * AUTO.PANORAMA_RATIO; hM = wM / aspect; }
   return { w: +(wM * 100).toFixed(1), h: +(hM * 100).toFixed(1) };
+}
+
+// 정규화 크기 + 매트 + 액자를 합한 외곽 치수(m) — 배치·길이 계산은 외곽 기준(placementRules 와 동일).
+export function autoOuter(aw, effScale) {
+  const ns = normalizedSize(aw, effScale);
+  const matte = aw.frame?.matte ? MATTE_BORDER : 0;
+  const st = FRAME_STYLES[aw.frame?.style ?? 'gold'];
+  const fw = st ? st.w : 0;
+  return { w: ns.w / 100 + 2 * (matte + fw), h: ns.h / 100 + 2 * (matte + fw) };
+}
+
+// --- A3 방 크기 자동 산정 -----------------------------------------------------
+const WALL_CW = ['north', 'east', 'south', 'west'];
+const WALL_CCW = ['north', 'west', 'south', 'east'];
+const OPP = { north: 'south', south: 'north', east: 'west', west: 'east' };
+
+// 방의 입구 벽(이전 공간에서 들어오는 벽). room[0] 은 로비(남쪽)에서 진입,
+// 그 외는 이전 방 출구 벽의 반대면(문은 공유 경계 = 반대 벽에서 만난다).
+export function entranceWallOf(project, roomId) {
+  const rooms = project.rooms || [];
+  const i = rooms.findIndex(r => r.id === roomId);
+  if (i <= 0) return 'south';
+  const prevExit = rooms[i - 1]?.exitDoor?.wall;
+  return prevExit ? OPP[prevExit] : null;
+}
+
+// 작품을 걸 벽 목록 — 입구/출구 벽 제외, 입구 다음부터 시계(또는 반시계) 순서.
+export function usableWalls(project, room, clockwise = true) {
+  const entrance = entranceWallOf(project, room.id);
+  const exit = room.exitDoor?.wall || null;
+  const block = new Set([entrance, exit].filter(Boolean));
+  const ring = clockwise ? WALL_CW : WALL_CCW;
+  const start = entrance ? (ring.indexOf(entrance) + 1) % 4 : 0;
+  const ordered = [];
+  for (let k = 0; k < 4; k++) ordered.push(ring[(start + k) % 4]);
+  const walls = ordered.filter(w => !block.has(w));
+  return walls.length ? walls : ordered.slice(); // 다 막히면 전부 사용(폴백)
+}
+
+// 방 크기 산정 + 벽 분배 계획(위치는 A4). 순수 함수(비변경).
+// 반환 { roomId, size{w,d,h}, entranceWall, exitWall, walls:[{wall, items:[id]}], gap, effScale, warnings, count }
+export function computeRoomPlan(project, roomId, opts = {}) {
+  const room = (project.rooms || []).find(r => r.id === roomId);
+  if (!room) return null;
+  const AL = project.autoLayout || {};
+  const autoSizeRoom = opts.autoSizeRoom ?? AL.autoSizeRoom ?? true;
+  const gapChar = opts.gapChar ?? AL.gapChar ?? 1.2;
+  const clockwise = opts.clockwise ?? AL.clockwise ?? true;
+  const gap = AUTO.CHAR_HEIGHT_M * gapChar;
+  const effScale = effectiveScale(project, room);
+  const warnings = [];
+
+  // route 순서(관람 동선) = 벽 채움 순서
+  const routeIdx = new Map((project.route || []).map((id, i) => [id, i]));
+  const ord = (a) => (routeIdx.has(a.id) ? routeIdx.get(a.id) : 1e9);
+  const arts = (room.artworks || []).slice().sort((a, b) => ord(a) - ord(b));
+
+  const walls = usableWalls(project, room, clockwise);
+  const K = walls.length;
+  const N = arts.length;
+
+  // 개수 균등 분할 (route 순서 순차 청크 — 시계방향 벽 순서 유지)
+  const dist = walls.map(w => ({ wall: w, items: [] }));
+  const base = Math.floor(N / K), rem = N % K;
+  let ci = 0;
+  for (let w = 0; w < K; w++) {
+    const cnt = base + (w < rem ? 1 : 0);
+    for (let j = 0; j < cnt; j++) dist[w].items.push(arts[ci++]);
+  }
+
+  const wallNeed = (items) => items.length
+    ? items.reduce((s, a) => s + autoOuter(a, effScale).w, 0) + (items.length - 1) * gap + 2 * AUTO.CORNER_MARGIN_M
+    : 0;
+  let needW = 0, needD = 0;
+  for (const d of dist) {
+    const need = wallNeed(d.items);
+    if (d.wall === 'north' || d.wall === 'south') needW = Math.max(needW, need);
+    else needD = Math.max(needD, need);
+  }
+
+  const [wLo, wHi] = RANGES.roomW, [dLo, dHi] = RANGES.roomD;
+  const size = { w: room.size.w, d: room.size.d, h: room.size.h };
+  if (autoSizeRoom) {
+    if (needW > 0) size.w = +Math.min(wHi, Math.max(wLo, needW)).toFixed(2);
+    if (needD > 0) size.d = +Math.min(dHi, Math.max(dLo, needD)).toFixed(2);
+  }
+  if (needW > wHi + 1e-6 || needD > dHi + 1e-6)
+    warnings.push(`작품이 많아 방 최대 크기(${Math.max(wHi, dHi)}m)를 넘습니다 — 방을 나누는 것을 권장합니다.`);
+  if (N > AUTO.ROOM_ART_CAP)
+    warnings.push(`이 방에 ${N}점 — ${AUTO.ROOM_ART_CAP}점 이하로 나누면 관람이 쾌적합니다.`);
+
+  return {
+    roomId, size,
+    entranceWall: entranceWallOf(project, roomId), exitWall: room.exitDoor?.wall || null,
+    walls: dist.map(d => ({ wall: d.wall, items: d.items.map(a => a.id) })),
+    gap, effScale, warnings, count: N,
+  };
 }

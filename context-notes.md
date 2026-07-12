@@ -29,6 +29,16 @@
 - **UI**: 룸 속성(Space 탭, 로비 제외)에 전역 슬라이더(드래그 중 라벨만 갱신, change 시 재렌더) + "이 방 개별 배율" 토글(on=현재 전역값 복사, off=delete autoScale) + 방별 슬라이더.
 - 라이브 검증: 순수함수 값, UI 전역/방별 왕복, project-zip 라운드트립(scaleSetting 3.7·autoScale 3.3 보존), 구 프로젝트 마이그레이션, 콘솔 클린.
 
+## A3 결정 (커밋 완료)
+- **순수 계획 함수만.** `computeRoomPlan` 은 비변경 — 크기·벽 분배·경고만 반환. 실제 room.size 적용·문 offset 클램프·위치 계산은 A4.
+- **입구 벽 판정**: room[0]=`south`(로비 남쪽에서 진입), 그 외 = 이전 방 exitDoor.wall 의 반대면(OPP) — 문은 공유 경계=반대 벽에서 만난다는 자유배치 불변식 이용(computeLayout 불필요).
+- **사용 벽** = 4벽 − {입구, 출구}, 입구 다음부터 시계(clockwise) 순회 → 관람 시작 방향. 다 막히면 폴백 전체.
+- **분배**: route(동선) 순서 정렬 → 벽 개수 균등 순차 청크(base+나머지 앞 벽). 축별 필요 길이 = 그 축 벽 중 max(Σ외곽폭 + (n−1)·gap + 2·corner). gap = CHAR_HEIGHT_M(1.4)×gapChar(1.2)=1.68m.
+- **크기**: autoSizeRoom 이면 size = clamp(needed, RANGES.roomW/D[min], 20). 확대·축소 모두(재정렬 대응). off 면 현재 유지. H 는 불변.
+- **경고**: needed>20(방 나누기 권장), count>ROOM_ART_CAP(12).
+- **문/이웃 커플링은 A4 로 미룸**: 크기 변경 시 exitDoor.offset 클램프·overlap 경고는 apply(A4)에서 처리, 사용자가 평면도에서 미세조정(초안 철학).
+- 라이브 검증: 6점 세로→west/east 3/3, 깊이 9→11.82m(3×2.42+2×1.68+1.2); 14점 가로→7/7, 깊이 20 cap + 경고 2건; autoSizeRoom off 유지.
+
 ## 범위
 - **P5(투어 모드)는 훅 포함 전체 제외** — 사용자 지시 "p5는 실행하지 않고 나머지만". 지시문상 v1.4 는 훅만 준비하라고 했으나, 사용자 지시를 보수적으로 해석해 tourMode 필드 예약·AvatarState 모듈화도 하지 않음.
 
