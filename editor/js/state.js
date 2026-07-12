@@ -1,6 +1,7 @@
 // editor/js/state.js
 // 프로젝트 모델 + 자동저장(IndexedDB) + undo/redo + 이미지 Blob 저장 + 프로젝트 zip 입출력.
-import { makeProject, makeRoom, makeArtwork, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts, ensureArtMeta, SCHEMA_VERSION } from '../../shared/schema.js';
+import { makeProject, makeRoom, makeArtwork, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts, ensureArtMeta, computeLayout, wallLength, SCHEMA_VERSION } from '../../shared/schema.js';
+import { resolvePlacement, EYE_LEVEL_CM } from '../../shared/placementRules.js';
 
 const DB_NAME = 'museum-maker';
 const DB_VER = 1;
@@ -192,6 +193,66 @@ export class ProjectStore extends EventTarget {
       || null;
   }
   select(sel) { Object.assign(this.selection, sel); this.emit('select'); }
+
+  // ---- A1(v1.5): 작품 → 섹션 할당 ----
+  // 보관함(_library) 또는 다른 방/로비에서 작품을 꺼내 대상 방에 넣는다.
+  // 배치 좌표는 자동 배치(A3/A4) 전 임시값 — 기본 벽에 균등 스프레드(겹침 밀어냄).
+  // 전체를 mutate 1회로 감싸 undo 1단계. 로비는 할당 대상이 아니다.
+  assignToRoom(ids, roomId) {
+    ids = (ids || []).filter(Boolean);
+    if (!ids.length || roomId === '__lobby__') return;
+    this.mutate(p => {
+      const room = p.rooms.find(r => r.id === roomId);
+      if (!room) return;
+      const lr = computeLayout(p).rooms.find(r => r.id === roomId);
+      const rect = lr?.rect;
+      const door = room.exitDoor;
+      // 문이 있는 벽은 피해 임시 배치 (자동 배치에서 최종 결정)
+      const wall = door && door.wall === 'north' ? 'east' : 'north';
+      const wallLen = rect ? wallLength(rect, wall) : room.size.w;
+      room.artworks = room.artworks || [];
+      p.route = p.route || [];
+      for (const id of ids) {
+        const art = this._extractArt(p, id);
+        if (!art) continue;
+        const res = resolvePlacement({
+          wallLen, wallH: room.size.h, u: wallLen / 2, v: EYE_LEVEL_CM / 100,
+          aw: art, others: room.artworks.filter(o => o.placement.wall === wall),
+          door: door && door.wall === wall ? { offset: door.offset } : null,
+        });
+        art.placement = { wall, x: +res.u.toFixed(2), centerHeightCm: Math.round(res.v * 100) };
+        room.artworks.push(art);
+        if (!p.route.includes(id)) p.route.push(id);
+      }
+    }, { detail: { assign: roomId } });
+    this.breakCoalesce();
+  }
+
+  // 작품 id 를 보관함/모든 방/로비에서 떼어내고 그 객체를 반환 (없으면 null).
+  _extractArt(p, id) {
+    const li = (p._library || []).findIndex(a => a.id === id);
+    if (li >= 0) return p._library.splice(li, 1)[0];
+    for (const r of p.rooms) {
+      const i = (r.artworks || []).findIndex(a => a.id === id);
+      if (i >= 0) return r.artworks.splice(i, 1)[0];
+    }
+    const bi = (p.lobby?.artworks || []).findIndex(a => a.id === id);
+    if (bi >= 0) return p.lobby.artworks.splice(bi, 1)[0];
+    return null;
+  }
+
+  // 보관함(대기함) 순서 재정렬 — 이 순서가 관람 동선(route) 채움 순서의 기준이 된다.
+  reorderLibrary(fromId, toId) {
+    if (!fromId || fromId === toId) return;
+    this.mutate(p => {
+      const lib = p._library || [];
+      const fi = lib.findIndex(a => a.id === fromId);
+      const ti = lib.findIndex(a => a.id === toId);
+      if (fi < 0 || ti < 0) return;
+      const [it] = lib.splice(fi, 1);
+      lib.splice(ti, 0, it);
+    }, { detail: { silent: true } });
+  }
 
   // ---- 검증 ----
   validate() { return validateProject(this.project); }

@@ -23,7 +23,7 @@ async function main() {
   window.__store = store;
   window.__views = {}; // 디버그/검증용 뷰 참조
 
-  new LibraryPanel(store, $('#library-root'));
+  new LibraryPanel(store, $('#library-root'), { onCreateRoom: createRoom });
   new Inspector(store, $('#inspector-root'), { onApiFill: (a) => openApiSearch(store, a) });
   plan = new PlanView(store, $('#canvas-host'), {
     onWallPick: () => setMode('elevation'),
@@ -460,22 +460,31 @@ function renderRoute() {
 // ---- 룸 스트립 ----
 function bindStrip() {
   $('#btn-add-room').addEventListener('click', () => {
-    store.mutate(p => {
-      // P2 자유 배치: 마지막 룸 주변 빈 자리(북→동→서→남)에 자동 배치 + 맞닿는 벽 중앙에 문 자동 설정
-      const layout = computeLayout(p);
-      const prev = p.rooms[p.rooms.length - 1];
-      const prevRect = layout.rooms[layout.rooms.length - 1]?.rect;
-      const size = { w: 12, d: 9 };
-      const origin = findFreeSpot(layout, prevRect, size);
-      if (prev && !prev.exitDoor && prevRect) {
-        prev.exitDoor = sharedDoor(prevRect, { xMin: origin.x, xMax: origin.x + size.w, zMin: origin.z, zMax: origin.z + size.d })
-          || { wall: 'north', offset: +(wallLength(prevRect, 'north') / 2).toFixed(2) };
-      }
-      p.rooms.push(makeRoom({ name: `${p.rooms.length + 1}. 새 섹션`, exitDoor: null, origin }, p.rooms.length));
-    }, { detail: {} });
+    createRoom();
     store.select({ roomId: store.project.rooms[store.project.rooms.length - 1].id });
   });
   renderStrip();
+}
+
+// P2 자유 배치: 마지막 룸 주변 빈 자리(북→동→서→남)에 자동 배치 + 맞닿는 벽 중앙에 문 자동 설정.
+// A1(v1.5): 파일명 그룹핑에서도 재사용 (LibraryPanel onCreateRoom). 새 룸 id 반환.
+function createRoom(name) {
+  let newId = null;
+  store.mutate(p => {
+    const layout = computeLayout(p);
+    const prev = p.rooms[p.rooms.length - 1];
+    const prevRect = layout.rooms[layout.rooms.length - 1]?.rect;
+    const size = { w: 12, d: 9 };
+    const origin = findFreeSpot(layout, prevRect, size);
+    if (prev && !prev.exitDoor && prevRect) {
+      prev.exitDoor = sharedDoor(prevRect, { xMin: origin.x, xMax: origin.x + size.w, zMin: origin.z, zMax: origin.z + size.d })
+        || { wall: 'north', offset: +(wallLength(prevRect, 'north') / 2).toFixed(2) };
+    }
+    const room = makeRoom({ name: name || `${p.rooms.length + 1}. 새 섹션`, exitDoor: null, origin }, p.rooms.length);
+    p.rooms.push(room);
+    newId = room.id;
+  }, { detail: {} });
+  return newId;
 }
 function renderStrip() {
   const root = $('#strip-scroll'); if (!root) return;

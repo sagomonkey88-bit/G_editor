@@ -285,6 +285,19 @@ export class PlanView {
   _bind() {
     const pos = (e) => { const r = this.canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
 
+    // A1(v1.5): 보관함 썸네일을 방으로 드래그 앤 드롭 = 할당
+    this.canvas.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+    this.canvas.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const id = e.dataTransfer.getData('text/artwork-id'); if (!id) return;
+      const [sx, sy] = pos(e);
+      const hit = this._hitRoom(sx, sy);
+      if (hit && hit.room.id !== '__lobby__') {
+        this.store.assignToRoom([id], hit.room.id);
+        this.store.select({ roomId: hit.room.id, artworkId: id });
+      }
+    });
+
     this.canvas.addEventListener('pointerdown', (e) => {
       const [sx, sy] = pos(e);
       const selId = this.store.selection.roomId;

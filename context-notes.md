@@ -2,6 +2,25 @@
 
 작업 중 내린 결정과 이유. 다음 세션(사람/에이전트)이 재추론 없이 이어받기 위한 기록.
 
+---
+
+# v1.5 PART A 컨텍스트 노트 (자동 배치)
+
+## 승인된 핵심 결정
+- **크기 모델 방안 A 승인**: 자동 배치(A2~A4)는 작품 `sizeCm` 에 표시 크기를 굽고 `scale=1.0` 기록. shared `resolveScale` 상한[0.3,3] 미변경(surgical). A1 에는 아직 크기 로직 없음.
+- 스코프: **PART A(A1~A5)만.** PART B 절대 미착수.
+
+## A1 결정 (커밋 완료)
+- **할당 = 데이터 이동**: `store.assignToRoom(ids, roomId)` 가 `_library`/다른 방/로비에서 작품을 꺼내(`_extractArt`) 대상 방 `room.artworks` 로 이동 + `route` 추가. 배치 좌표는 **자동 배치 전 임시값** — 문 없는 기본 벽(north, north에 문 있으면 east)에 `resolvePlacement` 로 균등 스프레드. 전체 mutate 1회 = undo 1스텝.
+- **로비 제외**: 로비는 타이틀월 공간이라 할당 대상 아님(`roomId==='__lobby__'` 이면 early return).
+- **다중 선택 UI**: 보관함(_library) 셀에만 체크박스(`.lib-check`). 셀 본문 클릭 = 인스펙터 선택(기존), 체크박스 = 배치 선택(별도, stopPropagation). 방 드롭다운은 `this.assignRoomId` 로 재렌더 후에도 유지.
+- **순서 = 동선**: 보관함 셀끼리 드래그 드롭 → `reorderLibrary` 가 `_library` 배열 재정렬. 배치 시 보관함 순서대로 route 에 push → A4 시계방향 채움 순서 기준.
+- **평면도 드롭**: planView `_bind` 에 canvas dragover/drop 추가 → `_hitRoom` 으로 방 판정 → `assignToRoom([id], roomId)`. 로비 위 드롭은 무시.
+- **파일명 그룹핑(선택 기능)**: 정규식 `^\s*\d+\s*[_.\-]\s*([^_.\-]+)` 로 접두어 뒤 첫 세그먼트 = 섹션명. 그룹 제안 모달(`.ed-modal` 재사용) → 적용 시 같은 이름 방 있으면 재사용, 없으면 `onCreateRoom` 콜백(app.js `createRoom`)으로 생성 후 할당.
+- **createRoom 추출**: app.js `btn-add-room` 핸들러 로직을 `createRoom(name)` 함수로 추출(동작 동일, 새 룸 id 반환). LibraryPanel 이 onCreateRoom 으로 재사용.
+- **신규 스키마 없음** → 라운드트립 무영향. 편집 전용 `_manual` 플래그는 A5 에서 추가 예정(exporter 삭제 목록에 함께).
+- 라이브 검증(preview MCP, 가짜 보관함 주입): 다중선택 배치→room.artworks 이동+스프레드+route순서, 평면도 드롭, reorder, 그룹핑(방 2개 생성+할당), undo 1스텝 복원, add-room 회귀 없음, 콘솔 클린.
+
 ## 범위
 - **P5(투어 모드)는 훅 포함 전체 제외** — 사용자 지시 "p5는 실행하지 않고 나머지만". 지시문상 v1.4 는 훅만 준비하라고 했으나, 사용자 지시를 보수적으로 해석해 tourMode 필드 예약·AvatarState 모듈화도 하지 않음.
 
