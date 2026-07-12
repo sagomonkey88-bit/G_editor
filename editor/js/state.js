@@ -1,7 +1,8 @@
 // editor/js/state.js
 // 프로젝트 모델 + 자동저장(IndexedDB) + undo/redo + 이미지 Blob 저장 + 프로젝트 zip 입출력.
-import { makeProject, makeRoom, makeArtwork, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts, ensureArtMeta, ensureAutoLayout, computeLayout, wallLength, SCHEMA_VERSION } from '../../shared/schema.js';
+import { makeProject, makeRoom, makeArtwork, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts, ensureArtMeta, ensureAutoLayout, computeLayout, wallLength, reflowOrigins, SCHEMA_VERSION } from '../../shared/schema.js';
 import { resolvePlacement, EYE_LEVEL_CM } from '../../shared/placementRules.js';
+import { computeRoomPlan, applyRoomPlan, ensureSectionText } from './autoLayout.js'; // v1.5 보완 B1/B2
 
 const DB_NAME = 'museum-maker';
 const DB_VER = 1;
@@ -197,11 +198,13 @@ export class ProjectStore extends EventTarget {
 
   // ---- A1(v1.5): 작품 → 섹션 할당 ----
   // 보관함(_library) 또는 다른 방/로비에서 작품을 꺼내 대상 방에 넣는다.
-  // 배치 좌표는 자동 배치(A3/A4) 전 임시값 — 기본 벽에 균등 스프레드(겹침 밀어냄).
-  // 전체를 mutate 1회로 감싸 undo 1단계. 로비는 할당 대상이 아니다.
+  // v1.5 보완 B1: 같은 mutate 안에서 자동 정렬(A4)까지 실행 — 벽 분배·크기 정규화·
+  // 방 크기 산정·섹션 텍스트(B2)가 배치 한 번으로 끝난다. undo 1단계.
+  // 반환: 자동 정렬 경고 문자열 배열(없으면 빈 배열). 로비는 할당 대상이 아니다.
   assignToRoom(ids, roomId) {
     ids = (ids || []).filter(Boolean);
-    if (!ids.length || roomId === '__lobby__') return;
+    if (!ids.length || roomId === '__lobby__') return [];
+    let warnings = [];
     this.mutate(p => {
       const room = p.rooms.find(r => r.id === roomId);
       if (!room) return;
@@ -225,8 +228,18 @@ export class ProjectStore extends EventTarget {
         room.artworks.push(art);
         if (!p.route.includes(id)) p.route.push(id);
       }
-    }, { detail: { assign: roomId } });
+      // B1: 배치 즉시 자동 정렬 — 계획(A3) → 적용(A4) → 하류 재배치 → 섹션 텍스트(B2)
+      const idx = p.rooms.findIndex(r => r.id === roomId);
+      const plan = computeRoomPlan(p, roomId);
+      if (plan) {
+        applyRoomPlan(p, plan);
+        reflowOrigins(p, idx);
+        ensureSectionText(p, roomId);
+        warnings = plan.warnings;
+      }
+    }, { detail: { assign: roomId, autoLayout: roomId } });
     this.breakCoalesce();
+    return warnings;
   }
 
   // 작품 id 를 보관함/모든 방/로비에서 떼어내고 그 객체를 반환 (없으면 null).
