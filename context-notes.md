@@ -21,6 +21,14 @@
 - **신규 스키마 없음** → 라운드트립 무영향. 편집 전용 `_manual` 플래그는 A5 에서 추가 예정(exporter 삭제 목록에 함께).
 - 라이브 검증(preview MCP, 가짜 보관함 주입): 다중선택 배치→room.artworks 이동+스프레드+route순서, 평면도 드롭, reorder, 그룹핑(방 2개 생성+할당), undo 1스텝 복원, add-room 회귀 없음, 콘솔 클린.
 
+## A2 결정 (커밋 완료)
+- **크기 계층만.** 배치는 A3/A4. A2 산출물 = 설정 스키마 + 순수 크기함수 + 튜닝 UI. 실제 sizeCm 적용은 A4 가 `normalizedSize` 호출.
+- **스키마**: `project.autoLayout{scaleSetting:3.5, gapChar:1.2, clockwise, protectManual, autoSizeRoom}` (makeAutoLayout/ensureAutoLayout). gapChar/clockwise/protectManual/autoSizeRoom 는 A3/A5 용 — 필드는 A2 에서 미리 확정(기본값 무해). 방별 오버라이드 `room.autoScale`(숫자|부재) — makeRoom 이 origin 처럼 조건부 보존, 마이그레이션 불필요(JSON 그대로 유지).
+- **autoLayout.js `AUTO` 상수**(캘리브레이션, 라이브 튜닝): CHAR_HEIGHT_M 1.4, HEIGHT_MULT 2.0, REF_SCALE 3.5, CENTER_H_M 1.75(A4), CORNER_MARGIN_M 0.6, GAP_MIN_M 0.4, PANORAMA_RATIO 3.0, ROOM_ART_CAP 12.
+- **목표 높이** = CHAR_HEIGHT_M × HEIGHT_MULT × (effScale/REF_SCALE). 3.5→2.8m, 3.0→2.4m, 4.0→3.2m. `normalizedSize` 는 목표높이로 h 고정, w=h×aspect(원본 _px 우선), aspect>3 파노라마는 w 상한=목표높이×3, h 비례 축소.
+- **UI**: 룸 속성(Space 탭, 로비 제외)에 전역 슬라이더(드래그 중 라벨만 갱신, change 시 재렌더) + "이 방 개별 배율" 토글(on=현재 전역값 복사, off=delete autoScale) + 방별 슬라이더.
+- 라이브 검증: 순수함수 값, UI 전역/방별 왕복, project-zip 라운드트립(scaleSetting 3.7·autoScale 3.3 보존), 구 프로젝트 마이그레이션, 콘솔 클린.
+
 ## 범위
 - **P5(투어 모드)는 훅 포함 전체 제외** — 사용자 지시 "p5는 실행하지 않고 나머지만". 지시문상 v1.4 는 훅만 준비하라고 했으나, 사용자 지시를 보수적으로 해석해 tourMode 필드 예약·AvatarState 모듈화도 하지 않음.
 

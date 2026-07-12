@@ -9,6 +9,7 @@ import { openPreview } from './previewBridge.js';
 import { LivePreview } from './livePreview.js';
 import { exportPublishZip } from './exporter.js';
 import { openApiSearch } from './apiSearch.js';
+import { AUTO_SCALE_RANGE, effectiveScale } from './autoLayout.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -234,6 +235,10 @@ function renderRoomProps() {
   const isLast = !isLobby && idx === store.project.rooms.length - 1;
   const R = isLobby ? { w: LOBBY_RANGES.w, d: LOBBY_RANGES.d, h: LOBBY_RANGES.h }
                     : { w: RANGES.roomW, d: RANGES.roomD, h: RANGES.roomH };
+  // A2: 자동 배치 배율 (전역 + 방별 오버라이드)
+  const scaleSetting = store.project.autoLayout?.scaleSetting ?? 3.5;
+  const hasAutoOverride = !isLobby && typeof room.autoScale === 'number';
+  const effScale = isLobby ? scaleSetting : effectiveScale(store.project, room);
   root.innerHTML = `
     <div class="panel-title">${isLobby ? '로비 속성 (그랜드 로비)' : '룸 속성'}</div>
     ${isLobby ? '<div class="hint-note" style="margin-bottom:10px">전시 타이틀월과 입장 문이 있는 대공간입니다. 삭제·순서 변경 불가.</div>' : `
@@ -244,6 +249,14 @@ function renderRoomProps() {
       <div class="field"><label>깊이 D (${R.d.join('–')}m)</label><input type="number" step="0.5" data-size="d" value="${room.size.d}"></div>
     </div>
     <div class="field"><label>높이 H (${R.h.join('–')}m)</label><input type="number" step="0.1" data-size="h" value="${room.size.h}"></div>
+    ${isLobby ? '' : `
+    <div class="panel-title" style="margin-top:14px">자동 배치</div>
+    <div class="field"><label>기본 배율 <b class="auto-scale-lbl">${scaleSetting}x</b> (${AUTO_SCALE_RANGE.join('–')}) · 전역</label>
+      <input type="range" data-auto-scale min="${AUTO_SCALE_RANGE[0]}" max="${AUTO_SCALE_RANGE[1]}" step="0.1" value="${scaleSetting}"></div>
+    <div class="toggle-row"><label>이 방 개별 배율 (적용 ${effScale}x)</label><div class="switch ${hasAutoOverride ? 'on' : ''}" data-auto-override></div></div>
+    ${hasAutoOverride ? `<div class="field"><label>이 방 배율 <b class="auto-room-lbl">${room.autoScale}x</b></label>
+      <input type="range" data-auto-room min="${AUTO_SCALE_RANGE[0]}" max="${AUTO_SCALE_RANGE[1]}" step="0.1" value="${room.autoScale}"></div>` : ''}
+    <div class="hint-note">배율·크기는 자동 정렬 실행 시 작품에 적용됩니다 (A4).</div>`}
     ${isLobby ? `
     <div class="panel-title" style="margin-top:14px">관람 설정</div>
     <div class="toggle-row"><label>방 이동 메뉴 허용 (M키·모바일 버튼)</label><div class="switch ${store.project.meta.allowTeleport !== false ? 'on' : ''}" data-allow-tp></div></div>` : ''}
@@ -267,6 +280,23 @@ function renderRoomProps() {
       store.breakCoalesce();
     });
   });
+  // A2: 자동 배치 배율 — 전역 슬라이더 + 방별 오버라이드 (드래그 중 재렌더 없이 라벨만 갱신)
+  root.querySelector('[data-auto-scale]')?.addEventListener('input', e => {
+    const v = +parseFloat(e.target.value).toFixed(1);
+    store.mutate(p => { p.autoLayout.scaleSetting = v; }, { detail: { silent: true }, coalesce: 'auto.scale' });
+    const lbl = root.querySelector('.auto-scale-lbl'); if (lbl) lbl.textContent = v + 'x';
+  });
+  root.querySelector('[data-auto-scale]')?.addEventListener('change', () => { store.breakCoalesce(); renderRoomProps(); });
+  root.querySelector('[data-auto-override]')?.addEventListener('click', () => {
+    upd(r => { if (typeof r.autoScale === 'number') delete r.autoScale; else r.autoScale = store.project.autoLayout.scaleSetting; }, { silent: false });
+    renderRoomProps();
+  });
+  root.querySelector('[data-auto-room]')?.addEventListener('input', e => {
+    const v = +parseFloat(e.target.value).toFixed(1);
+    upd(r => { r.autoScale = v; }, { coalesce: `auto.room:${room.id}` });
+    const lbl = root.querySelector('.auto-room-lbl'); if (lbl) lbl.textContent = v + 'x';
+  });
+  root.querySelector('[data-auto-room]')?.addEventListener('change', () => store.breakCoalesce());
   // P2(v1.4): 관람자 방 이동 허용 토글 (프로젝트 전역 — 로비 속성에 배치)
   root.querySelector('[data-allow-tp]')?.addEventListener('click', () => {
     store.mutate(p => { p.meta.allowTeleport = p.meta.allowTeleport === false; }, { detail: {} });

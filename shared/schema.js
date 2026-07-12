@@ -338,6 +338,24 @@ export function ensureArtMeta(project) {
   return project;
 }
 
+// --- 자동 배치 설정 (v1.5 A2) ------------------------------------------------
+// 자동 배치는 "가시성·웅장함" 우선(실측 재현 아님). scaleSetting = 목표 크기 기준 배율.
+// 방별 오버라이드는 room.autoScale(숫자|부재). 계산은 editor/js/autoLayout.js.
+export function makeAutoLayout(overrides = {}) {
+  return {
+    scaleSetting: 3.5,   // 3.0~4.0 (A2 슬라이더)
+    gapChar: 1.2,        // 작품 간격 = 캐릭터 키 × 이 값 (A3)
+    clockwise: true,     // 관람 동선 방향 (A4)
+    protectManual: true, // 수동 조정 보호 (A5)
+    autoSizeRoom: true,  // 방 크기 재산정 허용 (A3)
+    ...(overrides || {}),
+  };
+}
+export function ensureAutoLayout(project) {
+  project.autoLayout = makeAutoLayout(project.autoLayout);
+  return project;
+}
+
 // --- 기본값 팩토리 ----------------------------------------------------------
 export function makeArtwork(overrides = {}) {
   const id = overrides.id || uid('aw');
@@ -370,6 +388,7 @@ export function makeRoom(overrides = {}, index = 0) {
   return {
     ...(wallFaces ? { wallFaces } : {}),
     ...(overrides.origin ? { origin: { x: overrides.origin.x, z: overrides.origin.z } } : {}), // P2 자유 배치 좌표
+    ...(overrides.autoScale != null ? { autoScale: overrides.autoScale } : {}), // A2 방별 배율 오버라이드
     ...(overrides.texts ? { texts: overrides.texts } : {}), // P4 텍스트 오브젝트 보존
     id,
     name: overrides.name || `${index + 1}. 새 섹션`,
@@ -408,6 +427,7 @@ export function makeProject(overrides = {}) {
     introStyle: makeTextStyle('body', overrides.introStyle),
     titlePanel: makePanel('titlePanel', overrides.titlePanel),
     lobby: makeLobby(overrides.lobby || {}),
+    autoLayout: makeAutoLayout(overrides.autoLayout), // v1.5 A2: 자동 배치 설정
     avatarDefaults: { preset: 'capybara', body: 'default', garment: '#8DA98A',
                       ...(overrides.avatarDefaults || {}) },
     route: overrides.route || [],

@@ -1,6 +1,6 @@
 // editor/js/state.js
 // 프로젝트 모델 + 자동저장(IndexedDB) + undo/redo + 이미지 Blob 저장 + 프로젝트 zip 입출력.
-import { makeProject, makeRoom, makeArtwork, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts, ensureArtMeta, computeLayout, wallLength, SCHEMA_VERSION } from '../../shared/schema.js';
+import { makeProject, makeRoom, makeArtwork, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts, ensureArtMeta, ensureAutoLayout, computeLayout, wallLength, SCHEMA_VERSION } from '../../shared/schema.js';
 import { resolvePlacement, EYE_LEVEL_CM } from '../../shared/placementRules.js';
 
 const DB_NAME = 'museum-maker';
@@ -76,6 +76,7 @@ export class ProjectStore extends EventTarget {
     ensureOrigins(this.project);      // P2: 문 체인 배치 → 자유 배치(origin) 마이그레이션
     ensureTexts(this.project);        // P4: 고정 타이틀월/섹션 패널 → 자유 배치 텍스트 오브젝트
     ensureArtMeta(this.project);      // v1.4 P4: 작품 메타데이터 + 캡션 스타일
+    ensureAutoLayout(this.project);   // v1.5 A2: 자동 배치 설정 기본값
     if (!this.selection.roomId && this.project.rooms[0]) this.selection.roomId = this.project.rooms[0].id;
     this.emit('load');
     return this;
@@ -354,6 +355,7 @@ export class ProjectStore extends EventTarget {
     ensureOrigins(this.project);
     ensureTexts(this.project);
     ensureArtMeta(this.project);
+    ensureAutoLayout(this.project);
     this.selection = { roomId: project.rooms[0]?.id || null, artworkId: null, wall: null };
     this._undo.length = 0; this._redo.length = 0;
     await this.save();
@@ -379,6 +381,7 @@ export class ProjectStore extends EventTarget {
     ensureOrigins(this.project);
     ensureTexts(this.project);
     ensureArtMeta(this.project);
+    ensureAutoLayout(this.project);
     this.selection = { roomId: this.project.rooms[0].id, artworkId: null, wall: null, textId: null };
     this._undo.length = 0; this._redo.length = 0;
     await this.save();
