@@ -282,7 +282,7 @@ export function floorStyleTexture(floorDef, imageEl) {
 // panel:  { align, bg, widthCm }
 // styledTextCanvas → { canvas, wM, hM } (에디터 정면뷰 공용) / styledTextTexture → THREE 텍스처 래핑.
 // ctx.letterSpacing 미지원 브라우저는 글자 단위 수동 렌더로 폴백(실측 감지).
-const FONT_FAMILY = {
+export const FONT_FAMILY = {
   serif: `'Noto Serif KR', 'Pretendard', serif`,          // 명조
   sans: `'Pretendard', sans-serif`,                        // 고딕(기본)
   'noto-sans': `'Noto Sans KR', 'Pretendard', sans-serif`, // v1.3 P4

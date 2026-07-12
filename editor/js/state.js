@@ -1,6 +1,6 @@
 // editor/js/state.js
 // 프로젝트 모델 + 자동저장(IndexedDB) + undo/redo + 이미지 Blob 저장 + 프로젝트 zip 입출력.
-import { makeProject, makeRoom, makeArtwork, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts, SCHEMA_VERSION } from '../../shared/schema.js';
+import { makeProject, makeRoom, makeArtwork, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts, ensureArtMeta, SCHEMA_VERSION } from '../../shared/schema.js';
 
 const DB_NAME = 'museum-maker';
 const DB_VER = 1;
@@ -74,6 +74,7 @@ export class ProjectStore extends EventTarget {
     normalizeSurfaces(this.project);  // P5: 벽 색/패턴 필드 정규화 (구 프리셋 → 색 매핑)
     ensureOrigins(this.project);      // P2: 문 체인 배치 → 자유 배치(origin) 마이그레이션
     ensureTexts(this.project);        // P4: 고정 타이틀월/섹션 패널 → 자유 배치 텍스트 오브젝트
+    ensureArtMeta(this.project);      // v1.4 P4: 작품 메타데이터 + 캡션 스타일
     if (!this.selection.roomId && this.project.rooms[0]) this.selection.roomId = this.project.rooms[0].id;
     this.emit('load');
     return this;
@@ -186,7 +187,9 @@ export class ProjectStore extends EventTarget {
       const a = (r.artworks || []).find(x => x.id === this.selection.artworkId);
       if (a) return a;
     }
-    return (this.project.lobby?.artworks || []).find(x => x.id === this.selection.artworkId) || null;
+    return (this.project.lobby?.artworks || []).find(x => x.id === this.selection.artworkId)
+      || (this.project._library || []).find(x => x.id === this.selection.artworkId) // P4: 배치 전 편집
+      || null;
   }
   select(sel) { Object.assign(this.selection, sel); this.emit('select'); }
 
@@ -289,6 +292,7 @@ export class ProjectStore extends EventTarget {
     normalizeSurfaces(this.project);
     ensureOrigins(this.project);
     ensureTexts(this.project);
+    ensureArtMeta(this.project);
     this.selection = { roomId: project.rooms[0]?.id || null, artworkId: null, wall: null };
     this._undo.length = 0; this._redo.length = 0;
     await this.save();
@@ -313,6 +317,7 @@ export class ProjectStore extends EventTarget {
     normalizeSurfaces(this.project);
     ensureOrigins(this.project);
     ensureTexts(this.project);
+    ensureArtMeta(this.project);
     this.selection = { roomId: this.project.rooms[0].id, artworkId: null, wall: null, textId: null };
     this._undo.length = 0; this._redo.length = 0;
     await this.save();

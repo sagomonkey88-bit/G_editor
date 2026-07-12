@@ -287,6 +287,57 @@ export function ensureTexts(project) {
   return project;
 }
 
+// --- 캡션 시스템 (v1.4 P4) ---------------------------------------------------
+// 작품 메타데이터(artwork.meta): 한/영 제목·화가 + 관람객 공개 설명(description).
+// docentNote(비공개)와 별개 — description 은 Publish 에 포함된다.
+// captionStyle: 전역 project.captionStyle + 작품별 오버라이드('inherit' = 전역 사용).
+export const CAPTION_DEFAULTS = Object.freeze({
+  font: 'sans',            // TEXT_FONTS 재사용 (serif|sans|noto-sans|pretendard)
+  size: 'm',               // 's' | 'm' | 'l'
+  color: '#33291f',        // 글자색
+  bg: 'light',             // 'light' | 'dark' | 'none'
+  bgOpacity: 0.96,
+  border: false,
+  lang: 'both',            // 'ko' | 'en' | 'both'
+});
+export function makeCaptionStyle(overrides = {}) {
+  return { ...CAPTION_DEFAULTS, ...(overrides || {}) };
+}
+// 작품의 유효 캡션 스타일 (개별 오버라이드 → 전역 → 기본값)
+export function captionStyleOf(project, aw) {
+  const g = makeCaptionStyle(project?.captionStyle);
+  return (aw?.captionStyle && aw.captionStyle !== 'inherit') ? { ...g, ...aw.captionStyle } : g;
+}
+export function makeArtMeta(overrides = {}) {
+  return {
+    titleKo: '', titleEn: '', artistKo: '', artistEn: '', year: '',
+    description: '', source: 'manual', verified: false,
+    ...(overrides || {}),
+  };
+}
+// 마이그레이션: meta 부재 시 기존 caption 필드에서 생성 (한글 포함 여부로 한/영 분류)
+export function ensureArtMeta(project) {
+  const hasKo = (s) => /[가-힣]/.test(s || '');
+  const fix = (a) => {
+    if (!a.meta) {
+      const c = a.caption || {};
+      a.meta = makeArtMeta({
+        titleKo: hasKo(c.title) ? c.title : '',
+        titleEn: hasKo(c.title) ? '' : (c.title || ''),
+        artistKo: hasKo(c.artist) ? c.artist : '',
+        artistEn: hasKo(c.artist) ? '' : (c.artist || ''),
+        year: c.year || '',
+      });
+    }
+    if (a.captionStyle == null) a.captionStyle = 'inherit';
+  };
+  for (const r of (project.rooms || [])) for (const a of (r.artworks || [])) fix(a);
+  for (const a of (project.lobby?.artworks || [])) fix(a);
+  for (const a of (project._library || [])) fix(a);
+  project.captionStyle = makeCaptionStyle(project.captionStyle);
+  return project;
+}
+
 // --- 기본값 팩토리 ----------------------------------------------------------
 export function makeArtwork(overrides = {}) {
   const id = overrides.id || uid('aw');
@@ -294,6 +345,9 @@ export function makeArtwork(overrides = {}) {
     id,
     image: overrides.image || '',
     thumb: overrides.thumb || '',
+    ...(overrides.file ? { file: overrides.file } : {}), // 업로드 원본 파일명 (P4 재매칭용)
+    meta: makeArtMeta(overrides.meta),
+    captionStyle: overrides.captionStyle ?? 'inherit',
     caption: {
       title: '', artist: '', year: '', medium: '',
       collection: '', credit: 'Public domain', sourceUrl: '',

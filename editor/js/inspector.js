@@ -1,5 +1,6 @@
 // editor/js/inspector.js — 작품 인스펙터(좌측 패널, 작품 선택 시).
-import { PRESETS, RANGES } from '../../shared/schema.js';
+import { PRESETS, RANGES, makeCaptionStyle } from '../../shared/schema.js';
+import { matchFilename, metaFromEntry, aiFill, getApiKey, setApiKey, syncCaption } from './autoMeta.js';
 
 export class Inspector {
   constructor(store, root, opts = {}) {
@@ -21,22 +22,63 @@ export class Inspector {
     }
     const a = this.store.selectedArtwork;
     if (!a) { this.root.innerHTML = `<div class="inspector-empty">작품을 선택하면 속성이 표시됩니다.</div>`; return; }
+    if (this._csFor !== a.id) { this._csFor = a.id; this._csTarget = null; } // 작품 변경 시 캡션 스타일 탭 리셋
     const route = this.store.project.route || [];
     const rpos = route.indexOf(a.id);
     const c = a.caption || {};
+    // v1.4 P4: 작품 메타데이터 (한/영 · 설명 · source/verified)
+    const m = a.meta || {};
+    const badge = m.verified ? '<span class="meta-badge ok">확인됨</span>'
+      : m.source === 'auto' ? '<span class="meta-badge auto">사전 자동</span>'
+      : m.source === 'ai' ? '<span class="meta-badge ai">AI 추론 · 확인 필요</span>' : '';
+    // 캡션 스타일: 전역 기본 + 작품별 오버라이드 2단
+    const g = makeCaptionStyle(this.store.project.captionStyle);
+    const own = a.captionStyle && a.captionStyle !== 'inherit';
+    const csTarget = this._csTarget || (own ? 'own' : 'global');
+    const cs = csTarget === 'own' && own ? { ...g, ...a.captionStyle } : g;
+    const seg = (attrName, cur, opts, labels) =>
+      `<div class="seg" data-${attrName}>${opts.map(o => `<button data-v="${o}" class="${String(cur) === String(o) ? 'on' : ''}">${labels[o] ?? o}</button>`).join('')}</div>`;
     this.root.innerHTML = `
-      <div class="panel-title">작품 속성</div>
-      <div class="field"><label>제목</label><input type="text" data-cap="title" value="${attr(c.title)}"></div>
-      <div class="field"><label>작가</label><input type="text" data-cap="artist" value="${attr(c.artist)}"></div>
+      <div class="panel-title">작품 정보 ${badge}</div>
       <div class="field-row">
-        <div class="field"><label>연도</label><input type="text" data-cap="year" value="${attr(c.year)}"></div>
-        <div class="field"><label>재료</label><input type="text" data-cap="medium" value="${attr(c.medium)}"></div>
+        <div class="field"><label>작품명 (한글)</label><input type="text" data-meta="titleKo" value="${attr(m.titleKo)}"></div>
+        <div class="field"><label>작품명 (영문)</label><input type="text" data-meta="titleEn" value="${attr(m.titleEn)}"></div>
       </div>
-      <div class="field"><label>소장처</label><input type="text" data-cap="collection" value="${attr(c.collection)}"></div>
+      <div class="field-row">
+        <div class="field"><label>화가 (한글)</label><input type="text" data-meta="artistKo" value="${attr(m.artistKo)}"></div>
+        <div class="field"><label>화가 (영문)</label><input type="text" data-meta="artistEn" value="${attr(m.artistEn)}"></div>
+      </div>
+      <div class="field"><label>연도</label><input type="text" data-meta="year" value="${attr(m.year)}"></div>
+      <div class="field"><label>설명 (관람객 공개 · '자세히 보기'에 표시 · 500자)</label>
+        <textarea data-meta="description" maxlength="500">${text(m.description)}</textarea></div>
+      <div class="toggle-row"><label>작품 정보 확인함</label><div class="switch ${m.verified ? 'on' : ''}" data-meta-verified></div></div>
+      <div class="field-row" style="margin-bottom:8px">
+        <button class="tb-btn" data-rematch style="flex:1" title="파일명으로 내장 명화 사전에서 다시 찾기">🔁 사전 재매칭</button>
+        <button class="tb-btn" data-aifill style="flex:1" title="Anthropic API 로 파일명 기반 추론 (온라인 필요)">✨ AI로 채우기</button>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>재료</label><input type="text" data-cap="medium" value="${attr(c.medium)}"></div>
+        <div class="field"><label>소장처</label><input type="text" data-cap="collection" value="${attr(c.collection)}"></div>
+      </div>
       <div class="field"><label>크레딧</label><input type="text" data-cap="credit" value="${attr(c.credit)}"></div>
       <div class="field"><label>출처 URL</label><input type="text" data-cap="sourceUrl" value="${attr(c.sourceUrl)}"></div>
-      <button class="tb-btn" id="ins-api" style="width:100%;margin-bottom:8px">🔎 API로 채우기</button>
+      <button class="tb-btn" id="ins-api" style="width:100%;margin-bottom:8px">🔎 API로 채우기 (Met·AIC)</button>
       <button class="tb-btn" data-cover style="width:100%;margin-bottom:14px">${this.store.project.meta.coverId === a.id ? '★ 대표 이미지 (공유 미리보기)' : '☆ 대표 이미지로 지정'}</button>
+
+      <div class="panel-title">캡션 스타일 (명판)</div>
+      ${seg('cs-target', csTarget, ['global', 'own'], { global: '전시 전체 기본', own: own ? '이 작품만 ●' : '이 작품만' })}
+      <div class="field" style="margin-top:8px"><label>표기 언어</label>${seg('cs-seg="lang"', cs.lang, ['ko', 'en', 'both'], { ko: '한글만', en: '영문만', both: '한영 병기' })}</div>
+      <div class="field-row">
+        <div class="field"><label>글자 크기</label>${seg('cs-seg="size"', cs.size, ['s', 'm', 'l'], { s: '소', m: '중', l: '대' })}</div>
+        <div class="field"><label>글자색</label><input type="color" data-cs-color value="${attr(cs.color)}"></div>
+      </div>
+      <div class="field"><label>서체</label>
+        <select data-cs-font style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:7px">
+          ${['serif', 'sans', 'noto-sans', 'pretendard'].map(f => `<option value="${f}" ${cs.font === f ? 'selected' : ''}>${({ serif: '명조', sans: '고딕(기본)', 'noto-sans': 'Noto Sans', pretendard: 'Pretendard' })[f]}</option>`).join('')}
+        </select></div>
+      <div class="field"><label>명판 배경</label>${seg('cs-seg="bg"', cs.bg, ['light', 'dark', 'none'], { light: '라이트', dark: '다크', none: '없음' })}</div>
+      <div class="toggle-row"><label>명판 테두리</label><div class="switch ${cs.border ? 'on' : ''}" data-cs-border></div></div>
+      ${csTarget === 'own' && own ? '<button class="tb-btn" data-cs-reset style="width:100%;margin-bottom:8px;font-size:12px">개별 스타일 제거 (전체 기본 사용)</button>' : ''}
 
       <div class="field-row">
         <div class="field"><label>실측 폭 (cm)</label><input type="number" step="0.1" data-size="w" value="${a.sizeCm.w}"></div>
@@ -83,6 +125,58 @@ export class Inspector {
       { detail: { silent: opts.silent !== false }, coalesce: opts.coalesce });
 
     this.root.querySelectorAll('[data-cap]').forEach(inp => inp.addEventListener('input', () => upd(x => { x.caption[inp.dataset.cap] = inp.value; }, { coalesce: `cap:${inp.dataset.cap}:${a.id}` })));
+
+    // ---- v1.4 P4: 메타데이터 편집 (수정 시 source='manual' + caption 동기화) ----
+    this.root.querySelectorAll('[data-meta]').forEach(inp => inp.addEventListener('input', () =>
+      upd(x => { x.meta[inp.dataset.meta] = inp.value; x.meta.source = 'manual'; syncCaption(x); }, { coalesce: `meta:${inp.dataset.meta}:${a.id}` })));
+    this.root.querySelector('[data-meta-verified]').addEventListener('click', () => {
+      upd(x => { x.meta.verified = !x.meta.verified; }, { silent: false });
+      this.render();
+    });
+    this.root.querySelector('[data-rematch]').addEventListener('click', () => {
+      const hit = matchFilename(a.file || a.meta?.titleEn || a.caption?.title || '');
+      if (!hit) { window.__toast?.('내장 사전에서 일치하는 작품을 찾지 못했습니다.', true); return; }
+      upd(x => { Object.assign(x.meta, metaFromEntry(hit)); syncCaption(x); }, { silent: false });
+      window.__toast?.(`"${hit.titleKo}" (${hit.artistKo}) 정보를 채웠습니다.`);
+      this.render();
+    });
+    this.root.querySelector('[data-aifill]').addEventListener('click', () => this._aiFill(a));
+
+    // ---- v1.4 P4: 캡션 스타일 (전역 기본 / 작품별 오버라이드) ----
+    const csTarget = this._csTarget || ((a.captionStyle && a.captionStyle !== 'inherit') ? 'own' : 'global');
+    const setCS = (k, v, coalesce) => {
+      if (csTarget === 'global') {
+        this.store.mutate(p => { p.captionStyle = makeCaptionStyle(p.captionStyle); p.captionStyle[k] = v; }, { detail: {}, coalesce });
+      } else {
+        this.store.mutate(p => {
+          const x = find(p, a.id); if (!x) return;
+          if (!x.captionStyle || x.captionStyle === 'inherit') x.captionStyle = makeCaptionStyle(p.captionStyle);
+          x.captionStyle[k] = v;
+        }, { detail: {}, coalesce });
+      }
+    };
+    this.root.querySelector('[data-cs-target]').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      this._csTarget = b.dataset.v;
+      this.render();
+    });
+    this.root.querySelectorAll('[data-cs-seg]').forEach(el => el.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      setCS(el.dataset.csSeg, b.dataset.v);
+      this.render();
+    }));
+    this.root.querySelector('[data-cs-font]').addEventListener('change', (e) => setCS('font', e.target.value));
+    this.root.querySelector('[data-cs-color]').addEventListener('input', (e) => setCS('color', e.target.value, `cscolor:${csTarget}:${a.id}`));
+    this.root.querySelector('[data-cs-border]').addEventListener('click', () => {
+      const cur = csTarget === 'own' && a.captionStyle !== 'inherit' ? a.captionStyle.border : makeCaptionStyle(this.store.project.captionStyle).border;
+      setCS('border', !cur);
+      this.render();
+    });
+    this.root.querySelector('[data-cs-reset]')?.addEventListener('click', () => {
+      this.store.mutate(p => { const x = find(p, a.id); if (x) x.captionStyle = 'inherit'; }, { detail: {} });
+      this._csTarget = 'global';
+      this.render();
+    });
     this.root.querySelectorAll('[data-size]').forEach(inp => inp.addEventListener('input', () => upd(x => { const v = parseFloat(inp.value); if (v > 0) x.sizeCm[inp.dataset.size] = v; }, { coalesce: `awsize:${inp.dataset.size}:${a.id}` })));
     this.root.querySelector('[data-scale]').addEventListener('input', (e) => upd(x => { const v = parseFloat(e.target.value); if (v > 0) x.scale = v; }, { coalesce: `scale:${a.id}` }));
 
@@ -218,6 +312,53 @@ export class Inspector {
     });
   }
 
+  // ---- v1.4 P4: AI 로 정보 채우기 (Anthropic API · 온라인 필요) ----
+  async _aiFill(a) {
+    let key = getApiKey();
+    if (!key) {
+      key = await this._askApiKey();
+      if (!key) return;
+      setApiKey(key);
+    }
+    const btn = this.root.querySelector('[data-aifill]');
+    if (btn) { btn.disabled = true; btn.textContent = 'AI 조회 중…'; }
+    try {
+      const patch = await aiFill(a.file || a.meta?.titleEn || a.caption?.title || '', key);
+      if (!patch) {
+        window.__toast?.('AI가 작품을 식별하지 못했습니다. 직접 입력해 주세요.', true);
+        return;
+      }
+      this.store.mutate(p => { const x = find(p, a.id); if (x) { Object.assign(x.meta, patch); syncCaption(x); } }, { detail: {} });
+      window.__toast?.('AI 추론 결과를 채웠습니다 — 내용을 꼭 확인해 주세요.');
+    } catch (err) {
+      window.__toast?.('AI 채우기 실패: ' + err.message, true);
+    } finally {
+      this.render();
+    }
+  }
+
+  _askApiKey() {
+    return new Promise((resolve) => {
+      const pop = document.createElement('div');
+      pop.className = 'ed-modal';
+      pop.innerHTML = `
+        <div class="ed-card">
+          <div class="ed-title">AI로 정보 채우기 — API 키</div>
+          <div class="ed-body">Anthropic API 키가 필요합니다 (온라인 연결 필요).<br>
+            키는 <b>이 브라우저(localStorage)에만</b> 저장되며, 프로젝트 파일이나 Publish 결과물에 포함되지 않습니다.</div>
+          <input class="ed-input" type="password" placeholder="sk-ant-...">
+          <div class="ed-actions">
+            <button class="tb-btn" data-m="cancel">취소</button>
+            <button class="tb-btn accent" data-m="go">저장하고 조회</button>
+          </div>
+        </div>`;
+      document.body.appendChild(pop);
+      const done = (v) => { pop.remove(); resolve(v); };
+      pop.querySelector('[data-m=cancel]').addEventListener('click', () => done(null));
+      pop.querySelector('[data-m=go]').addEventListener('click', () => done(pop.querySelector('.ed-input').value.trim() || null));
+    });
+  }
+
   _moveRoute(id, dir) {
     this.store.mutate(p => {
       const i = p.route.indexOf(id); if (i < 0) return;
@@ -230,7 +371,8 @@ export class Inspector {
 
 function find(p, id) {
   for (const r of p.rooms) { const a = (r.artworks || []).find(x => x.id === id); if (a) return a; }
-  return (p.lobby?.artworks || []).find(x => x.id === id) || null;
+  return (p.lobby?.artworks || []).find(x => x.id === id)
+    || (p._library || []).find(x => x.id === id) || null; // P4: 배치 전 보관함 작품도 편집 가능
 }
 // 텍스트 오브젝트 탐색 (P4): 반환 { t, space } — space = room 또는 lobby
 function findText(p, id) {

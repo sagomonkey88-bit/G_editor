@@ -1,6 +1,6 @@
 // viewer/js/main.js — 뷰어 진입점: 데이터 로드 → 월드 빌드 → 렌더 루프.
 import * as THREE from '../../vendor/three.module.js';
-import { computeLayout, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts } from '../../shared/schema.js';
+import { computeLayout, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts, ensureArtMeta } from '../../shared/schema.js';
 import { buildWorld } from './world.js';
 import { buildArtworks } from './artwork.js';
 import { makeAvatar } from './avatar.js';
@@ -106,6 +106,7 @@ function normalizeProject(project) {
   normalizeSurfaces(project);
   ensureOrigins(project); // P2: 레거시 체인 배치 → origin
   ensureTexts(project);   // P4: 고정 타이틀월/섹션 패널 → 자유 배치 텍스트 오브젝트
+  ensureArtMeta(project); // v1.4 P4: 작품 메타데이터(한/영/설명) + 캡션 스타일
   return project;
 }
 

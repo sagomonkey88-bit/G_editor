@@ -2,6 +2,7 @@
 // 업로드 파이프라인(장변 2048 리사이즈 → WebP q0.85, 미지원 시 JPEG 폴백, 256 썸네일),
 // My Artworks 그리드.
 import { makeArtwork } from '../../shared/schema.js';
+import { matchFilename, metaFromEntry } from './autoMeta.js'; // v1.4 P4: 파일명 자동 메타데이터
 
 const MAX_EDGE = 2048;
 const THUMB_EDGE = 256;
@@ -70,14 +71,22 @@ export class LibraryPanel {
 
   async handleFiles(files) {
     const status = this.root.querySelector('#lib-status');
-    let n = 0;
+    let n = 0, matched = 0;
     for (const file of files) {
       status.textContent = `최적화 중… (${++n}/${files.length}) ${file.name}`;
       try {
         const res = await processImageFile(file);
+        // v1.4 P4: 파일명 → 내장 명화 사전 자동 매칭 (실패 시 파일명을 영문 제목으로)
+        const base = file.name.replace(/\.[^.]+$/, '');
+        const hit = matchFilename(file.name);
+        if (hit) matched++;
         const art = makeArtwork({
+          file: file.name,
           sizeCm: this._guessSize(res.width, res.height),
-          caption: { title: file.name.replace(/\.[^.]+$/, '') },
+          meta: hit ? metaFromEntry(hit) : { titleEn: base },
+          caption: hit
+            ? { title: hit.titleKo || hit.titleEn, artist: hit.artistKo || hit.artistEn, year: hit.year }
+            : { title: base },
         });
         art._px = { w: res.width, h: res.height }; // 비율 자동계산용(에디터 전용, export 시 제거)
         await this.store.addImage(art.id, res.blob, res.thumbBlob);
@@ -91,7 +100,9 @@ export class LibraryPanel {
         status.textContent = `실패: ${file.name} — ${err.message}`;
       }
     }
-    status.textContent = files.length ? `${files.length}개 업로드 완료. 크기(cm)를 확인하세요.` : '';
+    status.textContent = files.length
+      ? `${files.length}개 업로드 완료.` + (matched ? ` ${matched}개 작품 정보 자동 인식 — 확인 후 사용하세요.` : ' 크기(cm)를 확인하세요.')
+      : '';
     this.renderGrid();
   }
 

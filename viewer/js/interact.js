@@ -38,7 +38,9 @@ export class Interactions {
       <div class="zoom-stage"><img class="zoom-img" alt=""></div>
       <div class="zoom-panel">
         <div class="zp-title"></div>
+        <div class="zp-title-en"></div>
         <div class="zp-artist"></div>
+        <div class="zp-desc"></div>
         <dl class="zp-meta"></dl>
         <div class="zp-credit"></div>
       </div>
@@ -148,11 +150,20 @@ export class Interactions {
     this.controls.enabled = false;
     this.prompt.style.display = 'none';
     this.img.src = a.imageUrl;
-    this.overlay.querySelector('.zp-title').textContent = c.title || '';
-    this.overlay.querySelector('.zp-artist').textContent = c.artist || '';
+    // v1.4 P4: meta 기반 한/영 병기 + 설명(description) 본문
+    const m = a.artwork.meta || {};
+    const tKo = m.titleKo || '', tEn = m.titleEn || c.title || '';
+    const aKo = m.artistKo || '', aEn = m.artistEn || c.artist || '';
+    this.overlay.querySelector('.zp-title').textContent = tKo || tEn || '';
+    this.overlay.querySelector('.zp-title-en').textContent = (tKo && tEn && tEn !== tKo) ? tEn : '';
+    this.overlay.querySelector('.zp-artist').textContent =
+      (aKo && aEn) ? `${aKo} · ${aEn}` : (aKo || aEn || '');
+    const desc = this.overlay.querySelector('.zp-desc');
+    desc.textContent = m.description || '';
+    desc.style.display = m.description ? 'block' : 'none';
     const meta = this.overlay.querySelector('.zp-meta');
     const rows = [
-      ['연도', c.year], ['재료', c.medium],
+      ['연도', m.year || c.year], ['재료', c.medium],
       ['실측', a.artwork.sizeCm ? `${a.artwork.sizeCm.w} × ${a.artwork.sizeCm.h} cm` : ''],
       ['소장', c.collection],
     ].filter(r => r[1]);

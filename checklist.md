@@ -21,11 +21,11 @@
 - [x] 검증: 여러 방 미술관에서 M → 선택 → 1초 내 도착, allowTeleport=false 시 비노출
 
 ## P3. 평면도 아바타 인디케이터
-- [ ] viewer main.js: 프리뷰 모드에서 아바타 위치/시선(yaw) postMessage (≈30Hz, 변경 시만)
-- [ ] livePreview.js: museum-avatar-state 수신 → planView 전달
-- [ ] planView.js: 오버레이 캔버스 (pointer-events 무시) — 파란 원 + 방향 화살표 + 시야 부채꼴(약 80°)
-- [ ] 양방향: 인디케이터 드래그 → 3D 캐릭터 이동 (museum-teleport {x,z}, 페이드 없음)
-- [ ] 검증: 3D 제자리 회전 → 부채꼴 회전 동기, P2 텔레포트 후 즉시 위치 반영
+- [x] viewer main.js: 프리뷰 모드에서 아바타 위치/시선(yaw) postMessage (≈30Hz, 변경 시만)
+- [x] livePreview.js: museum-avatar-state 수신 → planView 전달
+- [x] planView.js: 오버레이 캔버스 (pointer-events 무시) — 파란 원 + 방향 화살표 + 시야 부채꼴(약 80°)
+- [x] 양방향: 인디케이터 드래그 → 3D 캐릭터 이동 (museum-teleport {x,z}, 페이드 없음)
+- [x] 검증: 3D 제자리 회전 → 부채꼴 회전 동기, P2 텔레포트 후 즉시 위치 반영
 
 ## P4. 캡션 시스템 개편
 - [ ] schema.js: artwork.meta { titleKo, titleEn, artistKo, artistEn, year, description, source, verified } + captionStyle('inherit'|객체) + project.captionStyle 전역 기본 + ensureArtMeta 마이그레이션

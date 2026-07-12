@@ -83,6 +83,12 @@ function fillCaption(store, c) {
     a.caption.credit = c.pd ? 'Public domain' : a.caption.credit;
     a.caption.sourceUrl = c.sourceUrl || a.caption.sourceUrl;
     if (size) { a.sizeCm.w = size.w; a.sizeCm.h = size.h; }
+    // v1.4 P4: Met/AIC 결과는 영문 — meta 영문 필드에도 반영 (한글 필드는 유지)
+    if (a.meta) {
+      a.meta.titleEn = c.title || a.meta.titleEn;
+      a.meta.artistEn = c.artist || a.meta.artistEn;
+      a.meta.year = c.year || a.meta.year;
+    }
   }, { detail: {} });
   store.emit('select'); // 인스펙터 갱신
   window.__toast?.(c.pd ? '캡션을 채웠습니다.' : '캡션을 채웠습니다(저작권 확인 필요).');
@@ -105,7 +111,8 @@ async function fetchJson(url) {
 }
 function findArt(p, id) {
   for (const r of p.rooms) { const a = (r.artworks || []).find(x => x.id === id); if (a) return a; }
-  return (p.lobby?.artworks || []).find(x => x.id === id) || null;
+  return (p.lobby?.artworks || []).find(x => x.id === id)
+    || (p._library || []).find(x => x.id === id) || null; // P4: 배치 전 보관함 작품
 }
 function esc(s) { return String(s ?? '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c])); }
 

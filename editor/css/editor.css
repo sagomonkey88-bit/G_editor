@@ -178,3 +178,9 @@ input, select, textarea { font-family: inherit; }
 #toast { position: fixed; bottom: 118px; left: 50%; transform: translateX(-50%); background: #2b313b; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 18px; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 999; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
 #toast.show { opacity: 1; }
 #toast.err { border-color: var(--danger); color: #f0c4c4; }
+
+/* v1.4 P4: 메타데이터 소스 배지 */
+.meta-badge { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 5px; font-size: 10.5px; font-weight: 700; vertical-align: 1px; }
+.meta-badge.auto { background: rgba(110, 163, 214, .18); color: #8fc1ee; border: 1px solid rgba(110, 163, 214, .4); }
+.meta-badge.ai { background: rgba(201, 122, 76, .18); color: #e0a276; border: 1px solid rgba(201, 122, 76, .45); }
+.meta-badge.ok { background: rgba(110, 190, 130, .16); color: #8fd6a4; border: 1px solid rgba(110, 190, 130, .4); }
