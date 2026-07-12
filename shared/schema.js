@@ -44,7 +44,7 @@ export const RANGES = Object.freeze({
 // 프리셋 화이트리스트 (검증용) -----------------------------------------------
 export const PRESETS = Object.freeze({
   wall: ['deep-red', 'green', 'navy', 'gray'],
-  floor: ['walnut-herringbone', 'oak-herringbone', 'ash-plank', 'walnut-plank'],
+  floor: ['walnut-herringbone', 'oak-herringbone', 'ash-plank', 'walnut-plank', 'custom'],
   frame: ['gold', 'wood', 'black', 'none'],
   lightingMood: ['warm', 'neutral', 'cool'],
   lightTemp: ['warm', 'neutral', 'cool'],
@@ -85,7 +85,7 @@ export function makeLobby(overrides = {}) {
   const lobby = {
     size: { w: 18, d: 12, h: 8, ...(overrides.size || {}) },
     wall: { preset: 'gray', pattern: false, ...(overrides.wall || {}) },
-    floor: { preset: 'walnut-plank', ...(overrides.floor || {}) },
+    floor: normalizeFloor({ preset: 'walnut-plank', ...(overrides.floor || {}) }),
     lighting: { mood: 'warm', ambient: 0.85, ...(overrides.lighting || {}) },
     decor: { chandelier: true, columns: true, cofferedCeiling: true, goldTrim: true, carpet: true,
              ...(overrides.decor || {}) },
@@ -120,6 +120,10 @@ export function normalizeWall(w = {}) {
 }
 export function normalizeFloor(f = {}) {
   const out = { preset: f.preset || 'walnut-herringbone', ...f };
+  // P1(v1.4): 단색 모드 + 무광/유광. 필드 부재 시 기존 외관과 동등한 값으로 정규화.
+  out.mode = out.mode || (out.preset === 'custom' ? 'custom' : 'preset');
+  out.color = out.color || '#6b4a30';
+  out.roughness = out.roughness === 'gloss' ? 'gloss' : 'matte';
   if (out.preset === 'custom') { out.scale = out.scale ?? 1; out.mirror = out.mirror ?? false; }
   return out;
 }
@@ -321,7 +325,7 @@ export function makeRoom(overrides = {}, index = 0) {
     introPanel: makePanel('introPanel', overrides.introPanel),
     size: { w: 12, d: 9, h: 4.2, ...(overrides.size || {}) },
     wall: { preset: 'deep-red', pattern: true, ...(overrides.wall || {}) },
-    floor: { preset: 'walnut-herringbone', ...(overrides.floor || {}) },
+    floor: normalizeFloor({ preset: 'walnut-herringbone', ...(overrides.floor || {}) }),
     lighting: { mood: 'warm', ambient: 0.6, ...(overrides.lighting || {}) },
     decor: { benches: true, spotlights: true, ...(overrides.decor || {}) },
     // 마지막 룸은 exitDoor: null. 기본은 north 직진.

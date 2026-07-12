@@ -236,8 +236,31 @@ export function wallStyleTexture(style, imageEl) {
   return out;
 }
 
-// 바닥: 프리셋 4종 유지 + 커스텀 업로드 슬롯 (P5)
+// 바닥: 프리셋 4종 + 커스텀 업로드 (P5) + 단색 모드 (v1.4 P1)
 export function floorStyleTexture(floorDef, imageEl) {
+  // 단색 모드: 베이스 색 + 아주 은은한 톤온톤 스펙클 (완전 플랫 방지)
+  if (floorDef?.mode === 'color') {
+    const color = floorDef.color || '#6b4a30';
+    const key = 'floorC:' + color;
+    if (_cache.has(key)) return _cache.get(key);
+    const S = 256;
+    const cv = canvas(S), g = cv.getContext('2d');
+    g.fillStyle = color; g.fillRect(0, 0, S, S);
+    const light = shade(color, 0.08), dark = shade(color, -0.10);
+    for (let i = 0; i < 900; i++) {
+      g.fillStyle = (i & 1) ? light : dark;
+      g.globalAlpha = 0.02 + Math.random() * 0.05;
+      const r = 0.8 + Math.random() * 2.2;
+      g.fillRect(Math.random() * S, Math.random() * S, r, r);
+    }
+    g.globalAlpha = 1;
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    const out = { tex, tileM: 2 };
+    _cache.set(key, out);
+    return out;
+  }
   if (floorDef?.preset === 'custom' && imageEl) {
     const key = 'floorS:' + (imageEl.src?.slice(-24) || '') + ':' + (floorDef.mirror ? 'm' : 'r');
     if (_cache.has(key)) return _cache.get(key);

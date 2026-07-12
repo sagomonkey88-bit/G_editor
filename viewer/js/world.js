@@ -55,9 +55,10 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
     const ftex = fs.tex.clone();
     ftex.needsUpdate = true;
     ftex.repeat.set(w / fs.tileM, d / fs.tileM);
+    // P1(v1.4): 무광/유광 — 유광은 낮은 roughness 로 조명 하이라이트의 은은한 반사감
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(w, d),
-      new THREE.MeshStandardMaterial({ map: ftex, roughness: 0.82, metalness: 0.0 })
+      new THREE.MeshStandardMaterial({ map: ftex, roughness: r.floor?.roughness === 'gloss' ? 0.30 : 0.82, metalness: 0.0 })
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(cx, 0, cz);

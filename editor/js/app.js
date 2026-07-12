@@ -319,6 +319,18 @@ function renderAtmosphere() {
       ${faceMode && hasOverride ? '<button class="tb-btn" data-face-reset style="width:100%;margin-top:8px;font-size:12px">이 면 개별 스타일 제거 (룸 기본값 사용)</button>' : ''}
     </div>
     <div class="swatch-group"><h4>바닥</h4>
+      <div class="seg" data-floor-mode style="margin-bottom:8px">
+        <button data-v="color" class="${F.mode === 'color' ? 'on' : ''}">단색</button>
+        <button data-v="texture" class="${F.mode !== 'color' ? 'on' : ''}">텍스처</button>
+      </div>
+      ${F.mode === 'color' ? `
+      <div class="field-row" style="align-items:center;gap:6px">
+        <input type="color" data-floor-color value="${F.color}" style="width:40px;height:30px;border:none;border-radius:6px;background:none;cursor:pointer">
+        <input type="text" data-floor-hex value="${F.color}" style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:6px 8px;font-size:12px">
+      </div>
+      <div class="swatches" style="margin-top:8px">${Object.entries(WALL_SWATCH).map(([k, c]) =>
+        `<div class="swatch ${F.color === c ? 'on' : ''}" data-floor-quick="${c}" style="background:${c}"><span>${LABELS[k]}</span></div>`).join('')}</div>
+      ` : `
       <div class="swatches">${Object.entries(FLOOR_SWATCH).map(([k, c]) =>
         `<div class="swatch ${F.preset === k ? 'on' : ''}" data-floor="${k}" style="background:${c}"><span>${LABELS[k]}</span></div>`).join('')}
         <div class="swatch ${F.preset === 'custom' ? 'on' : ''}" data-floor="custom" style="background:#444;display:${F.asset ? 'block' : 'none'}"><span>커스텀</span></div>
@@ -327,6 +339,9 @@ function renderAtmosphere() {
         <input type="range" data-floor-scale min="0.25" max="4" step="0.25" value="${F.scale || 1}"></div>
       <div class="toggle-row"><label>미러 반복</label><div class="switch ${F.mirror ? 'on' : ''}" data-floor-mirror></div></div>` : ''}
       <label class="lib-browse" style="display:block;text-align:center;margin-top:6px;font-size:12px">바닥 이미지 업로드<input type="file" accept="image/*" data-floor-upload hidden></label>
+      `}
+      <div class="toggle-row" style="margin-top:8px"><label>유광 (은은한 반사)</label><div class="switch ${F.roughness === 'gloss' ? 'on' : ''}" data-floor-gloss></div></div>
+      <button class="tb-btn" data-floor-all style="width:100%;margin-top:8px;font-size:12px">이 바닥을 모든 공간에 일괄 적용</button>
     </div>
     <div class="swatch-group"><h4>조명 무드</h4>
       <div class="seg" data-mood>${PRESETS.lightingMood.map(m => `<button data-v="${m}" class="${room.lighting.mood === m ? 'on' : ''}">${LABELS[m]}</button>`).join('')}</div></div>
@@ -355,9 +370,29 @@ function renderAtmosphere() {
   root.querySelector('[data-face-reset]')?.addEventListener('click', () => upd(r => {
     if (r.wallFaces) { delete r.wallFaces[wallDir]; if (!Object.keys(r.wallFaces).length) delete r.wallFaces; }
   }));
+  // P1(v1.4): 바닥 단색/텍스처 모드 + 색상 + 유광 + 전체 일괄
+  root.querySelector('[data-floor-mode]').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    upd(r => { r.floor.mode = b.dataset.v === 'color' ? 'color' : (r.floor.preset === 'custom' ? 'custom' : 'preset'); });
+  });
+  const fcolor = root.querySelector('[data-floor-color]');
+  if (fcolor) fcolor.addEventListener('input', e => { updQuiet(r => { r.floor.color = e.target.value; }, 'floorcolor:' + room.id); root.querySelector('[data-floor-hex]').value = e.target.value; });
+  root.querySelector('[data-floor-hex]')?.addEventListener('change', e => { const v = e.target.value.trim(); if (/^#[0-9a-fA-F]{6}$/.test(v)) upd(r => { r.floor.color = v; }); });
+  root.querySelectorAll('[data-floor-quick]').forEach(el => el.addEventListener('click', () => upd(r => { r.floor.color = el.dataset.floorQuick; })));
+  root.querySelector('[data-floor-gloss]').addEventListener('click', () => upd(r => { r.floor.roughness = r.floor.roughness === 'gloss' ? 'matte' : 'gloss'; }));
+  root.querySelector('[data-floor-all]').addEventListener('click', () => {
+    store.mutate(p => {
+      const src = roomRef(p, room.id); if (!src) return;
+      const def = JSON.stringify(src.floor);
+      for (const r of p.rooms) r.floor = JSON.parse(def);
+      if (p.lobby) p.lobby.floor = JSON.parse(def);
+    }, { detail: {} });
+    toast('모든 공간 바닥에 일괄 적용했습니다.');
+    renderAtmosphere();
+  });
   root.querySelectorAll('[data-floor]').forEach(el => el.addEventListener('click', () => {
     if (el.dataset.floor === 'custom' && !room.floor.asset) return;
-    upd(r => { r.floor.preset = el.dataset.floor; if (el.dataset.floor === 'custom') { r.floor.scale = r.floor.scale || 1; } });
+    upd(r => { r.floor.preset = el.dataset.floor; r.floor.mode = el.dataset.floor === 'custom' ? 'custom' : 'preset'; if (el.dataset.floor === 'custom') { r.floor.scale = r.floor.scale || 1; } });
   }));
   root.querySelector('[data-floor-scale]')?.addEventListener('input', e => updQuiet(r => { r.floor.scale = parseFloat(e.target.value); }, 'floorsc:' + room.id));
   root.querySelector('[data-floor-mirror]')?.addEventListener('click', () => upd(r => { r.floor.mirror = !r.floor.mirror; }));
@@ -387,7 +422,7 @@ async function uploadPattern(file, roomId, kind, faceDir = null) {
         } else delete r.wallFaces;
         t.pattern = 'custom'; t.patternAsset = id; t.patternScale = t.patternScale || 1;
       }
-      else { r.floor.preset = 'custom'; r.floor.asset = id; r.floor.scale = r.floor.scale || 1; }
+      else { r.floor.preset = 'custom'; r.floor.mode = 'custom'; r.floor.asset = id; r.floor.scale = r.floor.scale || 1; }
     }, { detail: {} });
     renderAtmosphere();
     toast('패턴을 적용했습니다. 반복 크기로 타일링을 조정하세요.');
