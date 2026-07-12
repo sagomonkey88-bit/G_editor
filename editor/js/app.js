@@ -28,10 +28,14 @@ async function main() {
   plan = new PlanView(store, $('#canvas-host'), {
     onWallPick: () => setMode('elevation'),
     onTeleport: (roomId) => live.teleport({ roomId }), // P2(v1.4): 룸 더블클릭 → 프리뷰 이동
+    onAvatarDrag: (x, z) => live.teleport({ x, z, fade: false }), // P3(v1.4): 인디케이터 드래그 → 3D 이동
   });
   elev = new ElevationView(store, $('#canvas-host'));
   elev.deactivate();
-  const live = new LivePreview(store, { onPaneResize: () => renderCanvas() }); // P1 스플릿 3D 프리뷰
+  const live = new LivePreview(store, {
+    onPaneResize: () => renderCanvas(),
+    onAvatarState: (s) => plan.setAvatar(s), // P3(v1.4): 3D 아바타 → 평면도 인디케이터
+  }); // P1 스플릿 3D 프리뷰
   buildFaceBar(); // P3 정면뷰 면 소속 표시 + 반대면 전환
   window.__views = { plan, elev, live };
 

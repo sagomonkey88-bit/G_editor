@@ -3,22 +3,22 @@
 범위: P1 → P2 → P3 → P4. **P5 는 사용자 지시로 전체 제외** (훅 준비 포함).
 
 ## P1. 바닥 색상 팔레트
-- [ ] schema.js: normalizeFloor 확장 — mode('preset'|'color'|'custom'), color, roughness('matte'|'gloss')
-- [ ] textures.js: floorStyleTexture 단색(color) 모드 분기
-- [ ] world.js: 바닥 재질 roughness 를 floor.roughness 에서 결정 (유광 = 은은한 반사)
-- [ ] app.js 분위기 패널: 바닥 단색/텍스처 전환 UI + 색상 피커/HEX/벽 팔레트 스와치 + 무광/유광 토글
-- [ ] "모든 공간 바닥 일괄 적용" 버튼 (undo 1단계)
-- [ ] 검증: 방마다 다른 바닥색 → 라이브 프리뷰 반영 → 프로젝트 zip 저장/재로드 → Publish ZIP 재현
+- [x] schema.js: normalizeFloor 확장 — mode('preset'|'color'|'custom'), color, roughness('matte'|'gloss')
+- [x] textures.js: floorStyleTexture 단색(color) 모드 분기
+- [x] world.js: 바닥 재질 roughness 를 floor.roughness 에서 결정 (유광 = 은은한 반사)
+- [x] app.js 분위기 패널: 바닥 단색/텍스처 전환 UI + 색상 피커/HEX/벽 팔레트 스와치 + 무광/유광 토글
+- [x] "모든 공간 바닥 일괄 적용" 버튼 (undo 1단계)
+- [x] 검증: 방마다 다른 바닥색 → 라이브 프리뷰 반영 → 프로젝트 zip 저장/재로드 → Publish ZIP 재현
 
 ## P2. 방 순간이동 (Room Teleport)
-- [ ] viewer/js/teleport.js 신설: 방 목록 모달(이름+번호), 미니 평면도 하이라이트, ↑↓/Enter/Esc/1~9
-- [ ] 단축키 M (T 는 기존 시계 토글과 충돌 → 지시문 대체 키), 모바일 상시 버튼(방 선택 시트)
-- [ ] 스폰 포인트 자동 계산 (입구 안쪽 + 방 중앙 바라봄) + 0.35s 페이드 + 카메라 리셋
-- [ ] controls.js: teleport(x, z, yaw) 메서드 (카메라 스냅 포함)
-- [ ] meta.allowTeleport 설정 (기본 on) — 에디터 로비 속성에 토글, 뷰어에서 존중
-- [ ] 평면도 더블클릭 → 라이브 프리뷰 텔레포트 (에디터 전용, postMessage)
-- [ ] manifest.json 에 teleport.js 추가 + HUD 도움말 갱신
-- [ ] 검증: 여러 방 미술관에서 M → 선택 → 1초 내 도착, allowTeleport=false 시 비노출
+- [x] viewer/js/teleport.js 신설: 방 목록 모달(이름+번호), 미니 평면도 하이라이트, ↑↓/Enter/Esc/1~9
+- [x] 단축키 M (T 는 기존 시계 토글과 충돌 → 지시문 대체 키), 모바일 상시 버튼(방 선택 시트)
+- [x] 스폰 포인트 자동 계산 (입구 안쪽 + 방 중앙 바라봄) + 0.35s 페이드 + 카메라 리셋
+- [x] controls.js: teleport(x, z, yaw) 메서드 (카메라 스냅 포함)
+- [x] meta.allowTeleport 설정 (기본 on) — 에디터 로비 속성에 토글, 뷰어에서 존중
+- [x] 평면도 더블클릭 → 라이브 프리뷰 텔레포트 (에디터 전용, postMessage)
+- [x] manifest.json 에 teleport.js 추가 + HUD 도움말 갱신
+- [x] 검증: 여러 방 미술관에서 M → 선택 → 1초 내 도착, allowTeleport=false 시 비노출
 
 ## P3. 평면도 아바타 인디케이터
 - [ ] viewer main.js: 프리뷰 모드에서 아바타 위치/시선(yaw) postMessage (≈30Hz, 변경 시만)

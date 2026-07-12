@@ -11,9 +11,10 @@ const LS_RATIO = 'museum-editor-split-ratio';
 const LS_OPEN = 'museum-editor-preview-open';
 
 export class LivePreview {
-  constructor(store, { onPaneResize } = {}) {
+  constructor(store, { onPaneResize, onAvatarState } = {}) {
     this.store = store;
     this.onPaneResize = onPaneResize || (() => {});
+    this.onAvatarState = onAvatarState || (() => {}); // P3(v1.4): 뷰어 아바타 위치/시선 수신
     this.workarea = document.getElementById('workarea');
     this.pane = document.getElementById('preview-pane');
     this.divider = document.getElementById('split-divider');
@@ -48,6 +49,8 @@ export class LivePreview {
         this._ready = true;
         this._send();
         if (!this.open) this._post({ type: 'museum-preview-pause', paused: true });
+      } else if (e.data.type === 'museum-avatar-state') {
+        this.onAvatarState(e.data); // P3(v1.4): 평면도 인디케이터 갱신
       }
     });
   }

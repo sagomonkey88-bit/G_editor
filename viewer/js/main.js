@@ -339,7 +339,7 @@ async function boot() {
         const tp = window.__museum.teleport;
         if (tp) {
           if (e.data.roomId) tp.teleportToRoom(e.data.roomId);
-          else if (typeof e.data.x === 'number') tp.teleportToPoint(e.data.x, e.data.z, e.data.yaw, { fade: e.data.fade !== false });
+          else if (typeof e.data.x === 'number') tp.teleportToPoint(e.data.x, e.data.z, e.data.yaw, { fade: e.data.fade !== false, validate: true });
         }
       } else if (e.data.type === 'museum-preview-pause') {
         // P1: 프리뷰 패널 접힘 → 렌더 루프 일시정지 / 펼침 → 재개
@@ -357,6 +357,10 @@ async function boot() {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
+
+  // P3(v1.4): 평면도 아바타 인디케이터 — 위치/시선(camYaw) 브로드캐스트 (프리뷰 호스트 전용)
+  const stateHost = params.get('preview') === '1' ? (window.opener || (window.parent !== window ? window.parent : null)) : null;
+  const lastAv = { x: NaN, z: NaN, yaw: NaN, t: 0 };
 
   let lastRoom = -1;
   let paused = false;
@@ -384,6 +388,17 @@ async function boot() {
           lastRoom = ci;
           for (const s of arts.spots) s.spot.visible = (s.roomIndex === ci);
           for (const m of world.moodLights) m.light.visible = (m.roomIndex === ci);
+        }
+      }
+    }
+    // P3(v1.4): ≈30Hz 스로틀 + 변화 시에만 전송 (추가 연산 없음 — 기존 transform 읽기만)
+    if (stateHost && controls) {
+      const now = performance.now();
+      if (now - lastAv.t > 33) {
+        const ax = controls.pos.x, az = controls.pos.y, ay = controls.camYaw;
+        if (!(Math.abs(ax - lastAv.x) < 0.01 && Math.abs(az - lastAv.z) < 0.01 && Math.abs(ay - lastAv.yaw) < 0.01)) {
+          lastAv.x = ax; lastAv.z = az; lastAv.yaw = ay; lastAv.t = now;
+          stateHost.postMessage({ type: 'museum-avatar-state', x: ax, z: az, yaw: ay }, location.origin);
         }
       }
     }

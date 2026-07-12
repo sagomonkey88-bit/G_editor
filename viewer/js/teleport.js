@@ -74,6 +74,13 @@ export class Teleport {
   teleportToPoint(x, z, yaw, opts = {}) {
     const c = this.ctx.controls;
     if (!c) return;
+    // P3(v1.4): 인디케이터 드래그 등 좌표 이동은 공간 내부·비충돌 지점만 허용
+    if (opts.validate) {
+      const { layout } = this.ctx;
+      const inside = [layout.lobby, ...layout.rooms.map(r => r.rect)]
+        .some(R => R && x >= R.xMin + 0.3 && x <= R.xMax - 0.3 && z >= R.zMin + 0.3 && z <= R.zMax - 0.3);
+      if (!inside || c._circleHit(x, z)) return;
+    }
     this.ctx.autowalk?.stop?.();
     const move = () => c.teleport(x, z, yaw);
     if (opts.fade === false) { move(); return; }

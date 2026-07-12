@@ -18,9 +18,16 @@ export class PlanView {
     this.host = host;
     this.onWallPick = opts.onWallPick || (() => {});
     this.onTeleport = opts.onTeleport || (() => {}); // P2(v1.4): 룸 더블클릭 → 프리뷰 순간이동
+    this.onAvatarDrag = opts.onAvatarDrag || (() => {}); // P3(v1.4): 인디케이터 드래그 → 3D 이동
     this.canvas = document.createElement('canvas');
     this.host.appendChild(this.canvas);
     this.ctx = this.canvas.getContext('2d');
+    // P3(v1.4): 아바타 인디케이터 오버레이 — 편집 렌더와 분리된 캔버스, 클릭 통과
+    this.overlay = document.createElement('canvas');
+    this.overlay.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:5;';
+    this.host.appendChild(this.overlay);
+    this.octx = this.overlay.getContext('2d');
+    this.avatar = null; // { x, z, yaw } — 라이브 프리뷰 아바타 상태
     this.view = { scale: 1, ox: 0, oy: 0 };
     this.drag = null;
     this.hoverWall = null;   // { roomId, wall } — 활성 룸 벽 호버 스냅
@@ -29,8 +36,8 @@ export class PlanView {
     this.resize();
   }
 
-  activate() { this.canvas.style.display = 'block'; this.resize(); }
-  deactivate() { this.canvas.style.display = 'none'; this.hoverWall = null; }
+  activate() { this.canvas.style.display = 'block'; this.overlay.style.display = 'block'; this.resize(); }
+  deactivate() { this.canvas.style.display = 'none'; this.overlay.style.display = 'none'; this.hoverWall = null; }
 
   resize() {
     const r = this.host.getBoundingClientRect();
@@ -38,9 +45,56 @@ export class PlanView {
     this.canvas.width = r.width * dpr; this.canvas.height = r.height * dpr;
     this.canvas.style.width = r.width + 'px'; this.canvas.style.height = r.height + 'px';
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.overlay.width = r.width * dpr; this.overlay.height = r.height * dpr;
+    this.octx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.cw = r.width; this.ch = r.height;
     this._fit(); // 드래그 중 store 변경 → resize() 경유 재호출돼도 뷰 변환은 고정
     this.render();
+  }
+
+  // ---- P3: 아바타 인디케이터 (위치 + 시야 콘) ------------------------------
+  setAvatar(state) {
+    this.avatar = state;
+    if (this.canvas.style.display !== 'none') this.renderOverlay();
+  }
+
+  renderOverlay() {
+    const g = this.octx;
+    if (!g || !this.cw) return;
+    g.clearRect(0, 0, this.cw, this.ch);
+    const a = this.avatar;
+    if (!a || this.canvas.style.display === 'none') return;
+    const [sx, sy] = this.w2s(a.x, a.z);
+    // 월드 시선 (sin yaw, cos yaw) = (동, 남) → 화면 (x, y) 그대로 매핑
+    const th = Math.atan2(Math.cos(a.yaw), Math.sin(a.yaw));
+    const R = 46, HALF = Math.PI * 40 / 180; // 시야 콘 80°
+    const grad = g.createRadialGradient(sx, sy, 4, sx, sy, R);
+    grad.addColorStop(0, 'rgba(90,162,230,.34)');
+    grad.addColorStop(1, 'rgba(90,162,230,0)');
+    g.fillStyle = grad;
+    g.beginPath(); g.moveTo(sx, sy); g.arc(sx, sy, R, th - HALF, th + HALF); g.closePath(); g.fill();
+    // 방향 화살표
+    g.strokeStyle = '#8fc1ee'; g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(sx + Math.cos(th) * 9, sy + Math.sin(th) * 9);
+    g.lineTo(sx + Math.cos(th) * 19, sy + Math.sin(th) * 19);
+    g.stroke();
+    g.beginPath();
+    g.moveTo(sx + Math.cos(th) * 25, sy + Math.sin(th) * 25);
+    g.lineTo(sx + Math.cos(th + 2.6) * 7 + Math.cos(th) * 17, sy + Math.sin(th + 2.6) * 7 + Math.sin(th) * 17);
+    g.lineTo(sx + Math.cos(th - 2.6) * 7 + Math.cos(th) * 17, sy + Math.sin(th - 2.6) * 7 + Math.sin(th) * 17);
+    g.closePath(); g.fillStyle = '#8fc1ee'; g.fill();
+    // 본체 (파란 원 + 흰 테두리)
+    g.beginPath(); g.arc(sx, sy, 7, 0, 7);
+    g.fillStyle = '#3f8edd'; g.fill();
+    g.lineWidth = 2; g.strokeStyle = '#fff'; g.stroke();
+  }
+
+  // 좌표가 어떤 공간(로비/룸) 내부인지 (인디케이터 드래그 유효성)
+  _insideSpace(x, z) {
+    const M = 0.35;
+    const rects = [this.layout?.lobby, ...(this.layout?.rooms || []).map(r => r.rect)];
+    return rects.some(R => R && x >= R.xMin + M && x <= R.xMax - M && z >= R.zMin + M && z <= R.zMax - M);
   }
 
   // 레이아웃은 항상 재계산, 뷰 변환(scale/offset)은 드래그 중 고정(커서-좌표 안정성)
@@ -137,6 +191,8 @@ export class PlanView {
     });
     g.font = '700 12px Pretendard'; g.textAlign = 'left';
     warns.slice(0, 3).forEach((t, i) => { g.fillStyle = '#d06a6a'; g.fillText(t, 16, ch - 16 - i * 18); });
+
+    this.renderOverlay(); // P3: 뷰 변환이 바뀌었을 수 있으므로 인디케이터 재투영
   }
 
   _rect(rect, fill, stroke, bold) {
@@ -234,6 +290,15 @@ export class PlanView {
       const selId = this.store.selection.roomId;
       const activeRect = this._rectOf(selId);
 
+      // 0) P3: 아바타 인디케이터 드래그 (양방향 동기화 — 3D 캐릭터 이동)
+      if (this.avatar) {
+        const [ax, ay] = this.w2s(this.avatar.x, this.avatar.z);
+        if (Math.hypot(sx - ax, sy - ay) < 13) {
+          this.drag = { type: 'avatar' };
+          this.canvas.setPointerCapture(e.pointerId);
+          return;
+        }
+      }
       // 1) 문 핸들 (활성 룸)
       if (this._doorHandle && Math.hypot(sx - this._doorHandle.x, sy - this._doorHandle.y) < 12) {
         this.drag = { type: 'door', ...this._doorHandle };
@@ -279,6 +344,16 @@ export class PlanView {
       const [sx, sy] = pos(e);
       if (!this.drag) { this._hover(sx, sy); return; }
 
+      if (this.drag.type === 'avatar') {
+        // P3: 공간 내부로만 이동 허용, 시선은 유지. 로컬 낙관 갱신 + 프리뷰로 전송(페이드 없음)
+        const [wx, wz] = this.s2w(sx, sy);
+        if (this._insideSpace(wx, wz)) {
+          this.avatar.x = wx; this.avatar.z = wz;
+          this.onAvatarDrag(wx, wz);
+          this.renderOverlay();
+        }
+        return;
+      }
       if (this.drag.type === 'door') this._dragDoor(sx, sy);
       else if (this.drag.type === 'resize') this._dragResize(sx, sy);
       else if (this.drag.type === 'maybe') {
@@ -322,7 +397,12 @@ export class PlanView {
     const rect = this._rectOf(selId);
     let cursor = 'default';
     let hw = null;
-    if (rect) {
+    // P3: 인디케이터 위 커서
+    if (this.avatar) {
+      const [ax, ay] = this.w2s(this.avatar.x, this.avatar.z);
+      if (Math.hypot(sx - ax, sy - ay) < 13) cursor = 'grab';
+    }
+    if (cursor === 'default' && rect) {
       if (selId !== '__lobby__') {
         const h = this._hitHandle(rect, sx, sy);
         if (h) cursor = HANDLE_CURSOR[h];
