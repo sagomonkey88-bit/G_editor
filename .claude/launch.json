@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "museum-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["_devserver.mjs"],
+      "port": 8777
+    }
+  ]
+}
