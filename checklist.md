@@ -47,3 +47,29 @@
 - [x] 항목 번호 포함 시맨틱 커밋 (A1~A5)
 
 ## PART A 완료. PART B 는 새 세션에서 이 문서만 다시 읽고 진행.
+
+---
+
+# v1.5 보완 패치 — 배치 UX (사용자 피드백 2026-07-13)
+
+배경: "선택 N점 배치"가 임시 배치(한 벽·원본 크기)에서 멈춰 자동 정렬 버튼을 따로 눌러야 했음.
+확정 사항: ①배치 즉시 자동 정렬 ②섹션 텍스트는 자동 정렬 시 생성+배치 ③드롭 시 섹션 선택 팝업.
+
+## B1. 배치 즉시 자동 정렬
+- [x] state.js: `assignToRoom` 이 같은 mutate 안에서 computeRoomPlan → applyRoomPlan → reflowOrigins 실행 (undo 1스텝), 경고 배열 반환
+- [x] libraryPanel.js / planView.js: 배치 후 경고 toast
+- [x] 검증: 5점 배치 → 벽 분배(2/2/1)·배율 3.5 크기·방 크기 산정까지 한 번에, undo 1스텝
+
+## B2. 섹션 텍스트 자동 생성·배치
+- [x] autoLayout.js: `ensureSectionText(project, roomId)` — role:'section' 텍스트 없으면 생성(다른 방 섹션 텍스트 스타일 복사, 없으면 기본값), 입구 벽 문 옆에 배치
+- [x] layoutRoom / layoutAll / assignToRoom 에서 reflowOrigins 후 호출
+- [x] 검증: 그룹핑으로 만든 새 방에 섹션명 텍스트 생성 + 기존 방 스타일 복사 확인
+
+## B3. 드래그 → 섹션 선택 팝업
+- [x] libraryPanel.js: 체크된 여러 점 드래그 시 `text/artwork-ids`(JSON) 전달 + `openAssignPopup(ids)` 모달
+- [x] app.js: 작업영역(#workarea) 드롭 → 팝업 (평면도 방 위 직접 드롭은 기존대로 즉시 배치)
+- [x] planView.js: 방 히트 시 stopPropagation·다중 id 지원, 미히트 시 버블 → 팝업
+- [x] 검증: 단일/다중 드래그, 팝업 배치, 평면도 직접 드롭 회귀 없음
+
+## 공통
+- [x] 라운드트립·콘솔 클린, 시맨틱 커밋 (B1~B3)

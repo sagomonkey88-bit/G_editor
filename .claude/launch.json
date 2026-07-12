@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["_devserver.mjs"],
       "port": 8777
+    },
+    {
+      "name": "museum-dev-2",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["_devserver.mjs", "8778"],
+      "port": 8778
     }
   ]
 }

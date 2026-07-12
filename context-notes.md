@@ -56,6 +56,38 @@
 - **A3.4 해석**: per-run 다이얼로그 대신 "방 크기 자동 조정" 토글(persist)로 "크기 유지/재산정" 제공 — 가장 단순한 해석.
 - 라이브 검증: 보호 ON t2 고정(x1/h90/w50)·OFF 재배치(x9.17/h175/w224); UI 4컨트롤·버튼·토글; 전체 다이얼로그+undo 1스텝; 3방 겹침 0; publish `_manual` 제거·work zip 유지·publish autoLayout 무해 잔존; 평면도 스크린샷(로비→1→2→3 체인, 겹침 0) 확인.
 
+# v1.5 보완 패치 컨텍스트 노트 (배치 UX — 사용자 피드백 2026-07-13)
+
+## 배경·확정 사항 (사용자 답변)
+- 피드백: "선택 N점 배치"가 임시 배치(한 벽·원본 크기)에서 멈춰 자동 정렬 버튼을 따로 눌러야 했음. 섹션 텍스트도 자동으로 안 들어감.
+- 확정: ①배치 즉시 자동 정렬 ②섹션 텍스트는 자동 정렬 시 생성+배치 ③드래그 드롭 시 섹션 선택 팝업.
+- 기본 배율 3~3.5 요구는 기존 구현(기본 3.5)으로 충족 — 작게 보인 원인은 자동 정렬 미실행이었음.
+
+## B1 결정 (배치 즉시 자동 정렬)
+- `assignToRoom` 이 **같은 mutate 안에서** computeRoomPlan(A3) → applyRoomPlan(A4) → reflowOrigins(하류만) → ensureSectionText(B2) 실행 → undo 1스텝. 기존 임시 스프레드 배치는 유지(placement 필수 전제) 후 applyRoomPlan 이 덮어씀.
+- state.js 가 editor/autoLayout.js 를 import (autoLayout 은 shared 만 의존 — 순환 없음).
+- 반환값 = plan.warnings 배열. 호출부(libraryPanel 배치 버튼·그룹핑, planView 드롭)가 toast 표시.
+- protectManual 등 A5 보호 규칙은 computeRoomPlan 이 그대로 적용 — 별도 처리 불필요.
+
+## B2 결정 (섹션 텍스트 자동 생성·배치)
+- `ensureSectionText(project, roomId)` (autoLayout.js): role:'section' 텍스트 없으면 생성 — **다른 방 섹션 텍스트를 donor 로 스타일·widthCm·bodyStyle·panel·light 깊은복사**, donor 없으면 ensureTexts(P4)와 동일 기본값.
+- 위치는 **입구 벽**(작품이 안 걸리는 벽) 문 옆, 남는 쪽으로 DOOR_W/2+0.4m+텍스트 반폭, 벽 안 클램프, 중심 160cm. 기존 텍스트도 자동 정렬 시마다 이 위치로 **재배치**(텍스트에는 _manual 보호 개념 없음 — 자동 정렬 의미론에 포함, undo 로 복구).
+- 문 로컬 좌표: 방 i>0 은 이전 방 exitDoor 를 wallLeftToWorld 로 월드 변환 후 입구 벽 역변환, 방 0 은 로비 북벽 중앙(viewer 개구부 규약). **reflowOrigins 이후 호출 필수**(origin 기반 절대좌표).
+- 호출 지점: layoutRoom / layoutAll(전 방) / assignToRoom. 신규 스키마 없음(P4 texts 재사용) → 라운드트립 무영향.
+
+## B3 결정 (드래그 → 섹션 선택 팝업)
+- 드래그 데이터 확장: 체크된 셀을 끌면 `text/artwork-ids`(JSON, 보관함 순서) 동봉 — 다중 드래그. 단일 `text/artwork-id` 는 호환 유지.
+- **평면도 방 위 직접 드롭 = 즉시 배치(stopPropagation)**, 방 미히트·정면뷰 등 작업영역(#workarea) 드롭 = 버블 → `library.openAssignPopup(ids)` 모달(ed-modal 재사용)에서 방 선택 후 배치. 팝업 선택값은 assignRoomId 에 저장(다음 기본값).
+- 3D 프리뷰(iframe) 위 드롭은 iframe 문서로 들어가 부모가 못 받음 — 미지원(편집 뷰 영역만).
+
+## 검증 (preview MCP, 포트 8778 — 다른 세션이 8777 점유 → launch.json 에 museum-dev-2 추가, _devserver 가 argv 포트 수용)
+- 5점 배치 1클릭: west3/east2(입구남·출구북 제외), h280cm·scale1·중심175, 방 d 9→13.87, 경고 0, undo 1스텝 완전 복원(보관함·크기·텍스트 원위치)·redo 정상.
+- 새 방(텍스트 0) 배치: tx-sec 생성 + donor 스타일 복사(color/widthCm/bodyStyle), 입구 벽 문 옆 배치, 3벽 분배(출구 없는 마지막 방).
+- 팝업: workarea 드롭 → 모달(방 목록), 선택 배치 → 이동·재정렬·텍스트 재배치. 평면도 방 위 직접 드롭 → 팝업 없이 즉시 배치(회귀 없음).
+- computeLayout overlaps 0, validate ok, 콘솔 클린.
+
+---
+
 ## 범위
 - **P5(투어 모드)는 훅 포함 전체 제외** — 사용자 지시 "p5는 실행하지 않고 나머지만". 지시문상 v1.4 는 훅만 준비하라고 했으나, 사용자 지시를 보수적으로 해석해 tourMode 필드 예약·AvatarState 모듈화도 하지 않음.
 
