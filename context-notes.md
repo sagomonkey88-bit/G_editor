@@ -39,6 +39,15 @@
 - **문/이웃 커플링은 A4 로 미룸**: 크기 변경 시 exitDoor.offset 클램프·overlap 경고는 apply(A4)에서 처리, 사용자가 평면도에서 미세조정(초안 철학).
 - 라이브 검증: 6점 세로→west/east 3/3, 깊이 9→11.82m(3×2.42+2×1.68+1.2); 14점 가로→7/7, 깊이 20 cap + 경고 2건; autoSizeRoom off 유지.
 
+## A4 결정 (커밋 완료)
+- **`layoutRoom(store, roomId, opts)`**: computeRoomPlan(A3) → mutate 1회로 [방 크기 적용 → exitDoor.offset 클램프 → 벽별 균등 간격 배치 → reflowOrigins] 수행. undo 1스텝.
+- **균등 간격**: usable = wallLen − 2·corner, g = (usable − Σ외곽폭)/(n+1), 양끝 코너여백 포함 등간격. 넘치면 g 음수 → 겹치나 벽 내 유지(경고는 A3). 중심 높이 = CENTER_H_M 1.75m 일괄(정규화 높이라 상하단 정렬).
+- **크기 굽기(방안 A)**: 각 작품 sizeCm = normalizedSize, scale=1.0. 결과는 수동 배치와 동일 필드.
+- **문 회피**: 배치 벽은 A3에서 입구/출구 제외 → 문 없는 벽. 별도 충돌검사 불필요(구성상 보장).
+- **옵션1 재배치 `reflowOrigins(project, start)`** (schema.js): 사이징으로 방이 커지면 꽉 붙은 이웃과 겹치는 문제 해결. exitDoor 체인을 따라 origin 재계산(next 방을 문 중앙에 정렬, 인접 배치=겹침 0). origin 기반(size.w=X,size.d=Z)이라 computeLayout 자유배치 브랜치와 정합. **start=대상 인덱스 → 상류 고정·하류만 이동**("이 방 자동 정렬"). A5 "전체 자동 배치"는 start=0.
+- **결정 근거**: 자유배치에서 방들이 findFreeSpot 으로 맞닿아 배치돼 제자리 확대가 로비/이웃을 침범 → 사용자 승인 하에 옵션1(사이징 후 체인 재배치) 채택.
+- 라이브 검증: 6점 겹침 해소(room0 origin z=-11.82 남벽 z=0), 3방×10점 겹침·에러 0 + upstreamFixed(room1 배치 시 room0 origin 불변) + last-room 3벽(4/3/3) 분배, undo 1스텝, 콘솔 클린. 신규 스키마 없음.
+
 ## 범위
 - **P5(투어 모드)는 훅 포함 전체 제외** — 사용자 지시 "p5는 실행하지 않고 나머지만". 지시문상 v1.4 는 훅만 준비하라고 했으나, 사용자 지시를 보수적으로 해석해 tourMode 필드 예약·AvatarState 모듈화도 하지 않음.
 

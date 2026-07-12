@@ -577,6 +577,40 @@ export function ensureOrigins(project) {
   return project;
 }
 
+// --- A4(v1.5, 옵션1): 방 크기 변경 후 겹침 없이 재배치 -----------------------
+// start 이상 인덱스의 방을 exitDoor 체인을 따라 재배치(origin 갱신). 상류(0..start-1)는 고정.
+// "이 방 자동 정렬" = 하류만(start=대상 인덱스), "전체 자동 배치" = 전체(start=0).
+// origin 기반(size.w=X, size.d=Z 실측 축) — computeLayout 자유배치 브랜치와 정합.
+export function reflowOrigins(project, start = 0) {
+  const rs = project.rooms || [];
+  if (!rs.length) return project;
+  const rectOf = (r) => ({ xMin: r.origin.x, xMax: r.origin.x + r.size.w, zMin: r.origin.z, zMax: r.origin.z + r.size.d });
+  let prevRect, i = start;
+  if (start <= 0) {
+    // room[0]: 로비 북쪽 중앙 (남벽 z=0, x 중심 0 = 로비 입장 문 위치)
+    rs[0].origin = { x: +(-rs[0].size.w / 2).toFixed(3), z: +(-rs[0].size.d).toFixed(3) };
+    prevRect = rectOf(rs[0]);
+    i = 1;
+  } else {
+    prevRect = rectOf(rs[start - 1]);
+  }
+  for (; i < rs.length; i++) {
+    const exit = rs[i - 1].exitDoor, room = rs[i];
+    let ox, oz;
+    if (!exit) { ox = prevRect.xMax + 2; oz = prevRect.zMin; } // 비정상(출구 없음) 폴백
+    else {
+      const door = wallLeftToWorld(prevRect, exit.wall, exit.offset);
+      if (exit.wall === 'north') { ox = door.x - room.size.w / 2; oz = prevRect.zMin - room.size.d; }
+      else if (exit.wall === 'south') { ox = door.x - room.size.w / 2; oz = prevRect.zMax; }
+      else if (exit.wall === 'east') { ox = prevRect.xMax; oz = door.z - room.size.d / 2; }
+      else { ox = prevRect.xMin - room.size.w; oz = door.z - room.size.d / 2; } // west
+    }
+    room.origin = { x: +ox.toFixed(3), z: +oz.toFixed(3) };
+    prevRect = rectOf(room);
+  }
+  return project;
+}
+
 // --- P2: 문 유효성 — 문 스팬이 경계선 반대편 인접 공간으로 완전히 덮이는가 ----
 // selfId: '__lobby__' 또는 room id. 벽 범위를 벗어난 문도 무효.
 export function doorCovered(layout, selfId, wall, offset, doorW = LAYOUT.DOOR_W) {

@@ -2,7 +2,7 @@
 // A2 크기 규칙(높이 정규화 + 파노라마 예외) · A3 방 크기 산정 · A4 배치 알고리즘의 순수 함수.
 // 크기 모델 방안 A: 자동 배치는 작품 sizeCm 에 표시 크기를 굽고 scale=1.0 으로 기록한다
 // (shared resolveScale 상한을 건드리지 않기 위함). viewer 는 이 모듈을 쓰지 않는다(에디터 전용).
-import { RANGES } from '../../shared/schema.js';
+import { RANGES, LAYOUT, reflowOrigins } from '../../shared/schema.js';
 import { FRAME_STYLES, MATTE_BORDER } from '../../shared/placementRules.js';
 
 // 고정 캘리브레이션 상수 — 라이브 프리뷰로 실측 튜닝. 하드코딩 금지 원칙에 따라 한 곳에 모음.
@@ -143,4 +143,54 @@ export function computeRoomPlan(project, roomId, opts = {}) {
     walls: dist.map(d => ({ wall: d.wall, items: d.items.map(a => a.id) })),
     gap, effScale, warnings, count: N,
   };
+}
+
+// --- A4 배치 알고리즘 ---------------------------------------------------------
+// A3 계획을 실제 배치로 적용: 방 크기 반영 → 문 offset 클램프 → 벽별 균등 간격 배치.
+// 방안 A 로 작품 sizeCm 에 정규화 크기를 굽고 scale=1.0. 결과는 수동 배치와 동일 필드.
+// 전체를 store.mutate 1회로 감싸 undo 1스텝(A5). 배치 벽은 문 없는 벽(A3)이라 충돌 검사 통과.
+export function layoutRoom(store, roomId, opts = {}) {
+  const plan = computeRoomPlan(store.project, roomId, opts);
+  if (!plan) return null;
+  store.mutate(p => {
+    const idx = p.rooms.findIndex(r => r.id === roomId);
+    const room = p.rooms[idx];
+    if (!room) return;
+    // 1) 방 크기 적용
+    room.size.w = plan.size.w; room.size.d = plan.size.d;
+    // 2) 문 offset 클램프 (벽 길이 변화 대응 — 자유배치 이웃/문 정합은 사용자가 평면도에서 미세조정)
+    if (room.exitDoor) {
+      const dl = (room.exitDoor.wall === 'north' || room.exitDoor.wall === 'south') ? plan.size.w : plan.size.d;
+      room.exitDoor.offset = +Math.max(LAYOUT.DOOR_W / 2, Math.min(dl - LAYOUT.DOOR_W / 2, room.exitDoor.offset)).toFixed(2);
+    }
+    // 3) 벽별 배치
+    const byId = new Map((room.artworks || []).map(a => [a.id, a]));
+    for (const wp of plan.walls) {
+      const items = wp.items.map(id => byId.get(id)).filter(Boolean);
+      if (!items.length) continue;
+      const wall = wp.wall;
+      const wallLen = (wall === 'north' || wall === 'south') ? plan.size.w : plan.size.d;
+      // 크기 굽기(방안 A) + 외곽 폭
+      const outers = [];
+      for (const a of items) {
+        const ns = normalizedSize(a, plan.effScale);
+        a.sizeCm = { ...a.sizeCm, w: ns.w, h: ns.h };
+        a.scale = 1.0;
+        outers.push(autoOuter(a, plan.effScale).w);
+      }
+      // 균등 간격: 양끝 코너 여백 + (n+1) 등간격. 넘치면 간격이 음수가 되어 겹치나 벽 안에 유지(경고는 A3).
+      const usable = wallLen - 2 * AUTO.CORNER_MARGIN_M;
+      const sumW = outers.reduce((s, w) => s + w, 0);
+      const g = (usable - sumW) / (items.length + 1);
+      let cursor = AUTO.CORNER_MARGIN_M + g;
+      for (let i = 0; i < items.length; i++) {
+        items[i].placement = { wall, x: +(cursor + outers[i] / 2).toFixed(2), centerHeightCm: Math.round(AUTO.CENTER_H_M * 100) };
+        cursor += outers[i] + g;
+      }
+    }
+    // 4) 옵션1: 이 방 + 하류 방 재배치(상류 고정) — 크기 확대로 인한 겹침 방지
+    reflowOrigins(p, idx);
+  }, { detail: { autoLayout: roomId } });
+  store.breakCoalesce();
+  return plan;
 }
