@@ -2,7 +2,7 @@
 // A2 크기 규칙(높이 정규화 + 파노라마 예외) · A3 방 크기 산정 · A4 배치 알고리즘의 순수 함수.
 // 크기 모델 방안 A: 자동 배치는 작품 sizeCm 에 표시 크기를 굽고 scale=1.0 으로 기록한다
 // (shared resolveScale 상한을 건드리지 않기 위함). viewer 는 이 모듈을 쓰지 않는다(에디터 전용).
-import { RANGES, LAYOUT, reflowOrigins } from '../../shared/schema.js';
+import { RANGES, LAYOUT, TEXT_DEFAULTS, reflowOrigins, computeLayout, wallLeftToWorld, wallLength, makeText } from '../../shared/schema.js';
 import { FRAME_STYLES, MATTE_BORDER, artworkOuterSize, resolvePlacement } from '../../shared/placementRules.js';
 
 // 고정 캘리브레이션 상수 — 라이브 프리뷰로 실측 튜닝. 하드코딩 금지 원칙에 따라 한 곳에 모음.
@@ -211,6 +211,75 @@ export function applyRoomPlan(project, plan) {
   }
 }
 
+// --- v1.5 보완 B2: 섹션 텍스트 자동 생성·배치 --------------------------------
+// 입구 벽 위 문 중심의 로컬 좌표(왼→오, wallLeftToWorld 역변환). 문을 못 찾으면 벽 중앙.
+function entranceDoorT(project, i, rect, wall) {
+  const layout = computeLayout(project);
+  let wx = null, wz = null;
+  if (i === 0) {
+    // 로비 → 첫 방: 문 = 로비 북벽 중앙 (viewer 개구부 규약과 동일)
+    const lb = layout.lobby;
+    if (lb) { wx = (lb.xMin + lb.xMax) / 2; wz = lb.zMin; }
+  } else {
+    const prev = project.rooms[i - 1];
+    const prevRect = layout.rooms[i - 1]?.rect;
+    if (prev?.exitDoor && prevRect) {
+      const d = wallLeftToWorld(prevRect, prev.exitDoor.wall, prev.exitDoor.offset);
+      wx = d.x; wz = d.z;
+    }
+  }
+  if (wx === null) return wallLength(rect, wall) / 2;
+  switch (wall) { // wallLeftToWorld 역변환
+    case 'north': return wx - rect.xMin;
+    case 'south': return rect.xMax - wx;
+    case 'east': return wz - rect.zMin;
+    default: return rect.zMax - wz; // west
+  }
+}
+
+// 방에 role:'section' 텍스트가 없으면 생성(다른 방 섹션 텍스트 스타일 복사, 없으면 기본값),
+// 자동 정렬 시마다 입구 벽(작품 없는 벽) 문 옆으로 배치. reflowOrigins 이후에 호출할 것
+// (위치 계산이 origin 기반 절대좌표를 쓰기 때문).
+export function ensureSectionText(project, roomId) {
+  const rooms = project.rooms || [];
+  const i = rooms.findIndex(r => r.id === roomId);
+  if (i < 0) return;
+  const room = rooms[i];
+  room.texts = room.texts || [];
+  let tx = room.texts.find(t => t.role === 'section');
+  if (!tx) {
+    const donor = rooms.filter(r => r !== room)
+      .map(r => (r.texts || []).find(t => t.role === 'section')).find(Boolean);
+    tx = donor
+      ? makeText({
+          id: 'tx-sec-' + room.id, role: 'section',
+          widthCm: donor.widthCm,
+          style: JSON.parse(JSON.stringify(donor.style || {})),
+          ...(donor.bodyStyle ? { bodyStyle: JSON.parse(JSON.stringify(donor.bodyStyle)) } : {}),
+          panel: { ...donor.panel }, light: { ...donor.light },
+        })
+      : makeText({ // ensureTexts(P4 마이그레이션)의 섹션 패널 기본값과 동일
+          id: 'tx-sec-' + room.id, role: 'section', widthCm: 260,
+          style: { italic: false, shadow: 'none', shadowColor: '', ...TEXT_DEFAULTS.secTitle },
+          bodyStyle: { ...TEXT_DEFAULTS.secBody },
+          panel: { align: 'left', bg: 'light' },
+        });
+    room.texts.push(tx);
+  }
+  const layout = computeLayout(project);
+  const rect = layout.rooms[i]?.rect;
+  if (!rect) return;
+  const wall = entranceWallOf(project, roomId) || 'south';
+  const len = wallLength(rect, wall);
+  const doorT = entranceDoorT(project, i, rect, wall);
+  const halfW = (tx.widthCm || 260) / 200; // cm → m 반폭
+  // 문 옆, 공간이 더 남는 쪽. 벽 안으로 클램프.
+  const side = doorT <= len / 2 ? 1 : -1;
+  let x = doorT + side * (LAYOUT.DOOR_W / 2 + 0.4 + halfW);
+  x = Math.max(AUTO.CORNER_MARGIN_M + halfW, Math.min(len - AUTO.CORNER_MARGIN_M - halfW, x));
+  tx.placement = { wall, x: +x.toFixed(2), centerHeightCm: 160 };
+}
+
 // "이 방 자동 정렬" (A5.1) — 이 방 + 하류 재배치(상류 고정). store.mutate 1회 = undo 1스텝.
 export function layoutRoom(store, roomId, opts = {}) {
   const idx = store.project.rooms.findIndex(r => r.id === roomId);
@@ -220,6 +289,7 @@ export function layoutRoom(store, roomId, opts = {}) {
   store.mutate(p => {
     applyRoomPlan(p, plan);
     reflowOrigins(p, idx); // 옵션1: 크기 확대로 인한 겹침 방지 (하류만 이동)
+    ensureSectionText(p, roomId); // B2: 섹션명 텍스트 생성·입구 벽 배치
   }, { detail: { autoLayout: roomId } });
   store.breakCoalesce();
   return plan;
@@ -234,6 +304,7 @@ export function layoutAll(store, opts = {}) {
       if (plan) { applyRoomPlan(p, plan); plans.push(plan); }
     }
     reflowOrigins(p, 0); // 전체 재배치
+    for (const room of p.rooms) ensureSectionText(p, room.id); // B2
   }, { detail: { autoLayoutAll: true } });
   store.breakCoalesce();
   return plans;
