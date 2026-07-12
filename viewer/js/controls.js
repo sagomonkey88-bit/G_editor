@@ -127,6 +127,19 @@ export class PlayerControls {
 
   setJoystick(x, y) { this.joy.active = (x || y) ? true : false; this.joy.x = x; this.joy.y = y; }
 
+  // P2(v1.4): 순간이동 — 위치/방향 설정 + 카메라 즉시 스냅 (스폰 방향 리셋)
+  teleport(x, z, yaw) {
+    this.pos.set(x, z);
+    if (typeof yaw === 'number') {
+      this.avatarYaw = yaw;
+      this.camYaw = yaw;
+      this.avatar.rotation.y = yaw;
+      this.camPitch = PITCH_DEFAULT;
+    }
+    this.avatar.position.set(x, 0, z);
+    this._follow(100); // dt 크게 → 감쇠 계수 ≈1, 카메라 하드 스냅
+  }
+
   _inputVector() {
     let fwd = 0, str = 0;
     const k = this.keys;

@@ -72,6 +72,12 @@ export class LivePreview {
     this._post({ type: 'museum-preview-data', project: proj, blobs });
   }
 
+  // P2(v1.4): 프리뷰 순간이동 — { roomId } 또는 { x, z, fade }
+  teleport(msg) {
+    if (!this._ready || !this.open) return;
+    this._post({ type: 'museum-teleport', ...msg });
+  }
+
   // ---- 접기/펼치기 (접으면 뷰어 렌더 루프 정지) ----
   toggle() { this.open ? this.collapse() : this.expand(); }
   collapse() {

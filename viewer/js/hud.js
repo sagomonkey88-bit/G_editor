@@ -281,8 +281,8 @@ export class HUD {
   _showHelp(onStart) {
     const touch = this.isMobile || (navigator.maxTouchPoints || 0) > 0 && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
     const rows = touch
-      ? [['조이스틱', '이동'], ['화면 드래그', '시점 회전 (상하 포함)'], ['두 손가락 핀치', '카메라 거리 줌'], ['프롬프트 탭', '작품 자세히 보기'], ['닫기 버튼', '돌아가기']]
-      : [['WASD / ←↑↓→', '이동'], ['Shift', '달리기'], ['마우스 드래그', '시점 회전 (상하 포함)'], ['휠', '카메라 거리 줌'], ['E', '작품 자세히 보기'], ['ESC', '닫기'],
+      ? [['조이스틱', '이동'], ['화면 드래그', '시점 회전 (상하 포함)'], ['두 손가락 핀치', '카메라 거리 줌'], ['프롬프트 탭', '작품 자세히 보기'], ['🗺 방 이동 버튼', '원하는 방으로 순간이동'], ['닫기 버튼', '돌아가기']]
+      : [['WASD / ←↑↓→', '이동'], ['Shift', '달리기'], ['마우스 드래그', '시점 회전 (상하 포함)'], ['휠', '카메라 거리 줌'], ['E', '작품 자세히 보기'], ['M', '방 이동 메뉴'], ['ESC', '닫기'],
          ['H', '화면 UI 숨기기(녹화용)'], ['T', '시계 표시'], ['P', '자동 도슨트 워크']];
     const pop = document.createElement('div');
     pop.className = 'help-pop';
@@ -323,7 +323,7 @@ export class HUD {
     hint.className = 'ingame-hint';
     hint.innerHTML = this.isMobile
       ? `왼쪽 조이스틱으로 이동 · 화면 드래그로 시점 · 핀치로 줌`
-      : `<b>WASD</b> 이동 · <b>드래그</b> 시점 · <b>휠</b> 줌 · <b>E</b> 자세히 · <b>H</b> UI숨김 · <b>T</b> 시계`;
+      : `<b>WASD</b> 이동 · <b>드래그</b> 시점 · <b>휠</b> 줌 · <b>E</b> 자세히 · <b>M</b> 방이동 · <b>H</b> UI숨김`;
     hud.appendChild(hint);
     this.hint = hint;
 

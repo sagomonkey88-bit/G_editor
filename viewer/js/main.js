@@ -8,6 +8,7 @@ import { PlayerControls } from './controls.js';
 import { Interactions } from './interact.js';
 import { HUD } from './hud.js';
 import { AutoWalk } from './autowalk.js';
+import { Teleport } from './teleport.js';
 import { AVATAR_PRESETS, LEGACY_PRESET_MAP } from './avatarPresets.js';
 
 const params = new URLSearchParams(location.search);
@@ -237,7 +238,7 @@ async function boot() {
   const b = layout.bounds;
   const target = { x: (b.xMin + b.xMax) / 2, y: 1.6, z: (b.zMin + b.zMax) / 2 };
 
-  let controls = null, interactions = null, orbit = null, avatar = null, hud = null, autowalk = null, editMode = null;
+  let controls = null, interactions = null, orbit = null, avatar = null, hud = null, autowalk = null, editMode = null, teleport = null;
   const EDIT = params.get('preview') === '1' && params.get('edit') === '1' && !isMobile; // P2 (데스크톱 전용)
 
   // 갤러리 입장 (캐릭터 선택 후 / skipIntro 즉시) — HUD onEnter 와 임베드 진입 공용
@@ -254,11 +255,18 @@ async function boot() {
     hud?.attachControls(controls);
     const dwell = parseFloat(params.get('dwell')) || 4;
     autowalk = new AutoWalk(controls, arts.anchors, layout, project, { dwell });
-    window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'p' && !interactions.isOpen) autowalk.toggle(); });
+    window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'p' && !interactions.isOpen && !teleport?.isOpen) autowalk.toggle(); });
     window.__museum.controls = controls;
     window.__museum.interactions = interactions;
     window.__museum.avatar = avatar;
     window.__museum.autowalk = autowalk;
+    // P2(v1.4): 방 순간이동 — meta.allowTeleport(기본 on), 터치 환경은 상시 버튼
+    const coarse = params.get('touch') === '1' || !!window.matchMedia?.('(pointer: coarse)').matches;
+    teleport = new Teleport(window.__museum, {
+      enabled: project.meta?.allowTeleport !== false,
+      touchButton: isMobile || coarse,
+    });
+    window.__museum.teleport = teleport;
   };
 
   if (DEBUG_CAM) {
@@ -317,6 +325,7 @@ async function boot() {
     }
     lastRoom = -99; // 라이트 매니저 재평가
     Object.assign(window.__museum, { project, world, arts });
+    teleport?.setEnabled(project2.meta?.allowTeleport !== false); // P2: 설정 변경 즉시 반영
     if (editMode) editMode.onRebuild();
   }
   window.__museum.rebuild = rebuild;
@@ -325,6 +334,13 @@ async function boot() {
       if (e.origin !== location.origin || !e.data) return;
       if (e.data.type === 'museum-preview-data' && window.__museum.ready) {
         rebuild(e.data.project, e.data.blobs);
+      } else if (e.data.type === 'museum-teleport') {
+        // P2/P3(v1.4): 에디터 평면도 더블클릭/인디케이터 드래그 → 프리뷰 이동
+        const tp = window.__museum.teleport;
+        if (tp) {
+          if (e.data.roomId) tp.teleportToRoom(e.data.roomId);
+          else if (typeof e.data.x === 'number') tp.teleportToPoint(e.data.x, e.data.z, e.data.yaw, { fade: e.data.fade !== false });
+        }
       } else if (e.data.type === 'museum-preview-pause') {
         // P1: 프리뷰 패널 접힘 → 렌더 루프 일시정지 / 펼침 → 재개
         window.__museum.setPaused?.(!!e.data.paused);

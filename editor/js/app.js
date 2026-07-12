@@ -25,7 +25,10 @@ async function main() {
 
   new LibraryPanel(store, $('#library-root'));
   new Inspector(store, $('#inspector-root'), { onApiFill: (a) => openApiSearch(store, a) });
-  plan = new PlanView(store, $('#canvas-host'), { onWallPick: () => setMode('elevation') });
+  plan = new PlanView(store, $('#canvas-host'), {
+    onWallPick: () => setMode('elevation'),
+    onTeleport: (roomId) => live.teleport({ roomId }), // P2(v1.4): 룸 더블클릭 → 프리뷰 이동
+  });
   elev = new ElevationView(store, $('#canvas-host'));
   elev.deactivate();
   const live = new LivePreview(store, { onPaneResize: () => renderCanvas() }); // P1 스플릿 3D 프리뷰
@@ -237,6 +240,9 @@ function renderRoomProps() {
       <div class="field"><label>깊이 D (${R.d.join('–')}m)</label><input type="number" step="0.5" data-size="d" value="${room.size.d}"></div>
     </div>
     <div class="field"><label>높이 H (${R.h.join('–')}m)</label><input type="number" step="0.1" data-size="h" value="${room.size.h}"></div>
+    ${isLobby ? `
+    <div class="panel-title" style="margin-top:14px">관람 설정</div>
+    <div class="toggle-row"><label>방 이동 메뉴 허용 (M키·모바일 버튼)</label><div class="switch ${store.project.meta.allowTeleport !== false ? 'on' : ''}" data-allow-tp></div></div>` : ''}
     ${isLobby || isLast ? (isLobby ? '' : '<div class="hint-note">마지막 룸 — 출구 문 없음</div>') : `
     <div class="field"><label>출구 문 벽</label>
       <div class="seg" data-exit-wall>${PRESETS.wallDir.map(w => `<button data-v="${w}" class="${room.exitDoor?.wall === w ? 'on' : ''}">${w}</button>`).join('')}</div></div>
@@ -256,6 +262,11 @@ function renderRoomProps() {
       upd(r => { r.size[inp.dataset.size] = v; }, { coalesce: `room.size:${inp.dataset.size}:${room.id}` });
       store.breakCoalesce();
     });
+  });
+  // P2(v1.4): 관람자 방 이동 허용 토글 (프로젝트 전역 — 로비 속성에 배치)
+  root.querySelector('[data-allow-tp]')?.addEventListener('click', () => {
+    store.mutate(p => { p.meta.allowTeleport = p.meta.allowTeleport === false; }, { detail: {} });
+    renderRoomProps();
   });
   const ew = root.querySelector('[data-exit-wall]');
   if (ew) ew.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; upd(r => { r.exitDoor = r.exitDoor || { offset: 3 }; r.exitDoor.wall = b.dataset.v; }, { silent: false }); renderRoomProps(); });

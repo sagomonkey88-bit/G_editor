@@ -17,6 +17,7 @@ export class PlanView {
     this.store = store;
     this.host = host;
     this.onWallPick = opts.onWallPick || (() => {});
+    this.onTeleport = opts.onTeleport || (() => {}); // P2(v1.4): 룸 더블클릭 → 프리뷰 순간이동
     this.canvas = document.createElement('canvas');
     this.host.appendChild(this.canvas);
     this.ctx = this.canvas.getContext('2d');
@@ -286,6 +287,13 @@ export class PlanView {
         if (Math.hypot(sx - this.drag.sx, sy - this.drag.sy) > DRAG_START_PX) this.drag.cancelled = true;
       }
       if (this.drag.type === 'move') this._dragMove(sx, sy);
+    });
+
+    // P2(v1.4): 룸 더블클릭 = 3D 프리뷰 해당 방으로 순간이동 (에디터 전용 편의)
+    this.canvas.addEventListener('dblclick', (e) => {
+      const [sx, sy] = pos(e);
+      const hit = this._hitRoom(sx, sy);
+      if (hit) this.onTeleport(hit.room.id);
     });
 
     this.canvas.addEventListener('pointerup', (e) => {
