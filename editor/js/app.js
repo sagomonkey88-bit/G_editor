@@ -24,7 +24,21 @@ async function main() {
   window.__store = store;
   window.__views = {}; // 디버그/검증용 뷰 참조
 
-  new LibraryPanel(store, $('#library-root'), { onCreateRoom: createRoom });
+  const library = new LibraryPanel(store, $('#library-root'), { onCreateRoom: createRoom });
+  // B3(v1.5 보완): 작품을 작업영역(평면도 빈 곳/정면뷰)에 떨어뜨리면 섹션 선택 팝업.
+  // 평면도의 방 위 직접 드롭은 planView 가 stopPropagation 으로 먼저 처리.
+  const workarea = $('#workarea');
+  workarea.addEventListener('dragover', (e) => {
+    if ([...e.dataTransfer.types].includes('text/artwork-id')) e.preventDefault();
+  });
+  workarea.addEventListener('drop', (e) => {
+    const multi = e.dataTransfer.getData('text/artwork-ids');
+    const single = e.dataTransfer.getData('text/artwork-id');
+    const ids = multi ? JSON.parse(multi) : (single ? [single] : []);
+    if (!ids.length) return;
+    e.preventDefault();
+    library.openAssignPopup(ids);
+  });
   new Inspector(store, $('#inspector-root'), { onApiFill: (a) => openApiSearch(store, a) });
   plan = new PlanView(store, $('#canvas-host'), {
     onWallPick: () => setMode('elevation'),

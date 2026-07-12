@@ -285,16 +285,22 @@ export class PlanView {
   _bind() {
     const pos = (e) => { const r = this.canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
 
-    // A1(v1.5): 보관함 썸네일을 방으로 드래그 앤 드롭 = 할당
+    // A1(v1.5): 보관함 썸네일을 방으로 드래그 앤 드롭 = 할당 (B3: 다중 id 지원)
+    // 방 미히트 시 stopPropagation 하지 않고 버블 → 작업영역 드롭 = 섹션 선택 팝업(app.js)
     this.canvas.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
     this.canvas.addEventListener('drop', (e) => {
+      const multi = e.dataTransfer.getData('text/artwork-ids');
+      const single = e.dataTransfer.getData('text/artwork-id');
+      const ids = multi ? JSON.parse(multi) : (single ? [single] : []);
+      if (!ids.length) return;
       e.preventDefault();
-      const id = e.dataTransfer.getData('text/artwork-id'); if (!id) return;
       const [sx, sy] = pos(e);
       const hit = this._hitRoom(sx, sy);
       if (hit && hit.room.id !== '__lobby__') {
-        this.store.assignToRoom([id], hit.room.id);
-        this.store.select({ roomId: hit.room.id, artworkId: id });
+        e.stopPropagation();
+        const warnings = this.store.assignToRoom(ids, hit.room.id);
+        for (const w of warnings) window.__toast?.(w, true);
+        this.store.select({ roomId: hit.room.id, artworkId: ids[0] });
       }
     });
 

@@ -164,7 +164,14 @@ export class LibraryPanel {
       const id = el.dataset.id;
       const isPlaced = el.classList.contains('placed');
       el.addEventListener('click', (e) => { if (e.target.classList.contains('lib-check')) return; this.store.select({ artworkId: id }); });
-      el.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/artwork-id', id); e.dataTransfer.effectAllowed = 'copyMove'; this._dragId = id; });
+      el.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/artwork-id', id);
+        // B3: 체크된 셀을 끌면 체크된 전체(보관함 순서)를 함께 드래그
+        const ids = this.selected.has(id) ? lib.map(a => a.id).filter(x => this.selected.has(x)) : [id];
+        e.dataTransfer.setData('text/artwork-ids', JSON.stringify(ids));
+        e.dataTransfer.effectAllowed = 'copyMove';
+        this._dragId = id;
+      });
       // 보관함 셀끼리 드롭 = 순서 재정렬
       if (!isPlaced) {
         el.addEventListener('dragover', (e) => { if (this._dragId && this._dragId !== id) { e.preventDefault(); el.classList.add('drop-t'); } });
@@ -188,13 +195,47 @@ export class LibraryPanel {
     roomSel?.addEventListener('change', () => { this.assignRoomId = roomSel.value; });
     grid.querySelector('.lib-assign-btn')?.addEventListener('click', () => {
       const order = lib.map(a => a.id).filter(id => this.selected.has(id)); // 보관함 순서 유지
-      this.store.assignToRoom(order, this.assignRoomId);
+      const warnings = this.store.assignToRoom(order, this.assignRoomId);
+      for (const w of warnings) window.__toast?.(w, true);
       this.selected.clear();
       this.renderGrid();
     });
     grid.querySelector('[data-lib-all]')?.addEventListener('click', () => { lib.forEach(a => this.selected.add(a.id)); this.renderGrid(); });
     grid.querySelector('[data-lib-none]')?.addEventListener('click', () => { this.selected.clear(); this.renderGrid(); });
     grid.querySelector('[data-lib-group]')?.addEventListener('click', () => this._autoGroup(lib));
+  }
+
+  // B3: 드롭 시 섹션 선택 팝업 — 작업영역에 작품을 떨어뜨리면 어느 방(섹션)에 넣을지 묻는다.
+  openAssignPopup(ids) {
+    ids = (ids || []).filter(Boolean);
+    const rooms = this.store.project.rooms;
+    if (!ids.length || !rooms.length) return;
+    const pop = document.createElement('div');
+    pop.className = 'ed-modal';
+    pop.innerHTML = `
+      <div class="ed-card">
+        <div class="ed-title">${ids.length}점을 어느 섹션에 배치할까요?</div>
+        <div class="ed-body">
+          <select class="lib-room-sel" style="width:100%">
+            ${rooms.map((r, i) => `<option value="${r.id}" ${r.id === this.assignRoomId ? 'selected' : ''}>${esc(r.name || ('방 ' + (i + 1)))}</option>`).join('')}
+          </select>
+        </div>
+        <div class="ed-actions">
+          <button class="tb-btn" data-m="cancel">취소</button>
+          <button class="tb-btn accent" data-m="go">배치</button>
+        </div>
+      </div>`;
+    document.body.appendChild(pop);
+    pop.querySelector('[data-m=cancel]').addEventListener('click', () => pop.remove());
+    pop.querySelector('[data-m=go]').addEventListener('click', () => {
+      const roomId = pop.querySelector('.lib-room-sel').value;
+      this.assignRoomId = roomId; // 다음 배치 기본값 유지
+      const warnings = this.store.assignToRoom(ids, roomId);
+      for (const w of warnings) window.__toast?.(w, true);
+      pop.remove();
+      for (const id of ids) this.selected.delete(id);
+      this.renderGrid();
+    });
   }
 
   // A1: 파일명 접두어(예 "01_르네상스_다빈치_모나리자") → 섹션명 그룹 제안
@@ -235,7 +276,7 @@ export class LibraryPanel {
       for (const [name, ids] of entries) {
         const exist = this.store.project.rooms.find(r => (r.name || '').includes(name));
         const roomId = exist ? exist.id : this.onCreateRoom(name);
-        if (roomId) this.store.assignToRoom(ids, roomId);
+        if (roomId) for (const w of this.store.assignToRoom(ids, roomId)) window.__toast?.(w, true);
       }
       pop.remove();
       this.selected.clear();
