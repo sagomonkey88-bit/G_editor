@@ -277,6 +277,7 @@ export class ProjectStore extends EventTarget {
     const scan = (r) => {
       if (r?.wall?.patternAsset) ids.add(r.wall.patternAsset);
       if (r?.floor?.asset) ids.add(r.floor.asset);
+      if (r?.ceiling?.muralImage) ids.add(r.ceiling.muralImage); // P2(v1.6) 천장화
       for (const f of Object.values(r?.wallFaces || {})) if (f?.patternAsset) ids.add(f.patternAsset); // P3
     };
     for (const r of this.project.rooms) scan(r);
@@ -314,8 +315,8 @@ export class ProjectStore extends EventTarget {
       zip.file(holder[field], im.blob);
     };
     const packFaces = (r) => { for (const f of Object.values(r?.wallFaces || {})) packPattern(f, 'patternAsset'); }; // P3
-    for (const r of proj.rooms) { packPattern(r.wall, 'patternAsset'); packPattern(r.floor, 'asset'); packFaces(r); }
-    if (proj.lobby) { packPattern(proj.lobby.wall, 'patternAsset'); packPattern(proj.lobby.floor, 'asset'); packFaces(proj.lobby); }
+    for (const r of proj.rooms) { packPattern(r.wall, 'patternAsset'); packPattern(r.floor, 'asset'); packPattern(r.ceiling, 'muralImage'); packFaces(r); }
+    if (proj.lobby) { packPattern(proj.lobby.wall, 'patternAsset'); packPattern(proj.lobby.floor, 'asset'); packPattern(proj.lobby.ceiling, 'muralImage'); packFaces(proj.lobby); }
     zip.file('museum.json', JSON.stringify(proj, null, 2));
     zip.file('_projectfile.txt', '이 zip 은 미술관 메이커의 "작업 파일"입니다. Publish 배포본과 다릅니다.\n에디터에서 [프로젝트 불러오기]로 다시 열 수 있습니다.');
     return await zip.generateAsync({ type: 'blob' });
@@ -354,8 +355,8 @@ export class ProjectStore extends EventTarget {
       holder[field] = id;
     };
     const unpackFaces = async (r) => { for (const f of Object.values(r?.wallFaces || {})) await unpackPattern(f, 'patternAsset'); }; // P3
-    for (const r of project.rooms) { await unpackPattern(r.wall, 'patternAsset'); await unpackPattern(r.floor, 'asset'); await unpackFaces(r); }
-    if (project.lobby) { await unpackPattern(project.lobby.wall, 'patternAsset'); await unpackPattern(project.lobby.floor, 'asset'); await unpackFaces(project.lobby); }
+    for (const r of project.rooms) { await unpackPattern(r.wall, 'patternAsset'); await unpackPattern(r.floor, 'asset'); await unpackPattern(r.ceiling, 'muralImage'); await unpackFaces(r); }
+    if (project.lobby) { await unpackPattern(project.lobby.wall, 'patternAsset'); await unpackPattern(project.lobby.floor, 'asset'); await unpackPattern(project.lobby.ceiling, 'muralImage'); await unpackFaces(project.lobby); }
     // 기존 이미지 정리
     for (const [id, im] of this.images) { URL.revokeObjectURL(im.url); URL.revokeObjectURL(im.thumbUrl); await idbDel(this.db, STORE_IMG, id); }
     this.images.clear();
