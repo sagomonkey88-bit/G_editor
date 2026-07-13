@@ -15,6 +15,7 @@
     "viewer/js/hud.js",
     "viewer/js/autowalk.js",
     "viewer/js/teleport.js",
+    "viewer/js/seating.js",
     "viewer/js/editMode.js"
   ],
   "shared": [

@@ -9,6 +9,7 @@ import { Interactions } from './interact.js';
 import { HUD } from './hud.js';
 import { AutoWalk } from './autowalk.js';
 import { Teleport } from './teleport.js';
+import { Seating } from './seating.js';
 import { AVATAR_PRESETS, LEGACY_PRESET_MAP } from './avatarPresets.js';
 
 const params = new URLSearchParams(location.search);
@@ -240,7 +241,7 @@ async function boot() {
   const b = layout.bounds;
   const target = { x: (b.xMin + b.xMax) / 2, y: 1.6, z: (b.zMin + b.zMax) / 2 };
 
-  let controls = null, interactions = null, orbit = null, avatar = null, hud = null, autowalk = null, editMode = null, teleport = null;
+  let controls = null, interactions = null, orbit = null, avatar = null, hud = null, autowalk = null, editMode = null, teleport = null, seating = null;
   const EDIT = params.get('preview') === '1' && params.get('edit') === '1' && !isMobile; // P2 (데스크톱 전용)
 
   // 갤러리 입장 (캐릭터 선택 후 / skipIntro 즉시) — HUD onEnter 와 임베드 진입 공용
@@ -254,6 +255,8 @@ async function boot() {
       spawnX: layout.spawn.x, spawnZ, oneWayColliders: world.oneWayColliders,
     });
     interactions = new Interactions(controls, arts.anchors, document.getElementById('hud'));
+    seating = new Seating(controls, world.benchAnchors, document.getElementById('hud')); // P3-2 미디어 룸 착석
+    window.__museum.seating = seating;
     hud?.attachControls(controls);
     const dwell = parseFloat(params.get('dwell')) || 4;
     autowalk = new AutoWalk(controls, arts.anchors, layout, project, { dwell });
@@ -320,6 +323,7 @@ async function boot() {
     arts = buildArtworks(scene, project2, layout, ctx, resolveAsset);
     if (controls) { controls.colliders = world.colliders; controls.oneWayColliders = world.oneWayColliders; }
     if (interactions) { interactions.anchors = arts.anchors; interactions.current = null; }
+    if (seating) { if (controls?.seated) controls.stand(); seating.anchors = world.benchAnchors; seating.near = null; }
     if (autowalk) {
       autowalk.stop?.();
       autowalk.anchors = arts.anchors;
@@ -383,6 +387,7 @@ async function boot() {
       if (autowalk && autowalk.active) autowalk.update(dt);
       controls.update(dt);
       if (interactions) interactions.update(dt);
+      if (seating) seating.update();
       // 라이트 매니저: 모바일은 현재 룸의 조명만 활성(§5.8)
       if (isMobile && (arts.spots.length || world.moodLights.length)) {
         const ci = currentRoomIndex(controls.pos, layout);

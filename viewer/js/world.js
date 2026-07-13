@@ -8,7 +8,7 @@
 // 벽은 "라인 유니온" 방식으로 만든다: 모든 룸+로비의 4변을 같은 직선끼리 합쳐
 // 경계마다 벽을 딱 한 번만 생성 → 공유벽 이중생성/ z-fighting 없음. 문은 구멍으로 뺀다.
 import * as THREE from '../../vendor/three.module.js';
-import { LAYOUT, wallLeftToWorld, wallLength, wallFaceStyle, doorCovered, doorHiddenSide, findOppositeFace, textBlocks } from '../../shared/schema.js';
+import { LAYOUT, wallLeftToWorld, wallLength, wallFaceStyle, doorCovered, doorHiddenSide, findOppositeFace, generateBenches, textBlocks } from '../../shared/schema.js';
 import { wallStyleTexture, floorStyleTexture, styledTextTexture, WALL_COLORS } from './textures.js';
 import { makeSpotlight } from './artwork.js';
 
@@ -216,12 +216,25 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
     if (sc) screens.push({ ...sc, roomId: r.id });
   }
 
-  // ---- 벤치 (decor.benches) ----
+  // ---- 벤치 ----
+  // 미디어 룸 = 스크린 향한 자동 벤치(그리드, 착석 앵커), 그 외 = decor.benches 중앙 1개.
+  let benchAssets = null;
+  const benchAnchors = [];
   for (const r of rects) {
-    if (r.isLobby || !r.room?.decor?.benches) continue;
-    const { rect } = r;
-    const cx = (rect.xMin + rect.xMax) / 2, cz = (rect.zMin + rect.zMax) / 2;
-    addBench(group, colliders, cx, cz);
+    if (r.isLobby || !r.room) continue;
+    const isMedia = (r.room.roomType || 'gallery') === 'media' && r.room.screen;
+    if (isMedia) {
+      let benches = r.room.benches;
+      if (!Array.isArray(benches) || !benches.length) benches = generateBenches(r.room, r.rect); // 폴백 자동 생성
+      for (const b of benches) {
+        if (!benchAssets) benchAssets = makeBenchAssets();
+        addBenchAt(group, colliders, benchAssets, b.x, b.z, b.yaw);
+        benchAnchors.push({ x: b.x, z: b.z, yaw: b.yaw, roomId: r.id });
+      }
+    } else if (r.room.decor?.benches) {
+      const { rect } = r;
+      addBench(group, colliders, (rect.xMin + rect.xMax) / 2, (rect.zMin + rect.zMax) / 2);
+    }
   }
 
   // ---- 룸/로비 조명 무드 (§7: warm/neutral/cool + ambient) ----
@@ -248,7 +261,28 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
   // ---- 텍스트 오브젝트 (v1.3 P4 — 타이틀월/섹션 패널 포함 자유 배치) ----
   buildTexts(group, project, layout);
 
-  return { group, colliders, rects, moodLights, oneWayColliders, screens };
+  return { group, colliders, rects, moodLights, oneWayColliders, screens, benchAnchors };
+}
+
+// --- 미디어 룸 벤치 (P3-2) — 절차적 저폴리, 방 간 공유 지오/머티리얼. yaw=스크린 향함 -----
+function makeBenchAssets() {
+  return {
+    seatMat: new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: 0.6 }),
+    legMat: new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 0.5 }),
+    seatGeo: new THREE.BoxGeometry(1.6, 0.12, 0.5),
+    legGeo: new THREE.BoxGeometry(0.1, 0.45, 0.44),
+  };
+}
+function addBenchAt(group, colliders, a, x, z, yaw) {
+  const g = new THREE.Group();
+  const seat = new THREE.Mesh(a.seatGeo, a.seatMat); seat.position.y = 0.45; seat.castShadow = true; g.add(seat);
+  for (const dx of [-0.7, 0.7]) { const leg = new THREE.Mesh(a.legGeo, a.legMat); leg.position.set(dx, 0.225, 0); g.add(leg); }
+  g.position.set(x, 0, z); g.rotation.y = yaw;
+  group.add(g);
+  // 회전 반영 AABB (seat 로컬 1.6×0.5)
+  const ex = 0.8 * Math.abs(Math.cos(yaw)) + 0.25 * Math.abs(Math.sin(yaw));
+  const ez = 0.8 * Math.abs(Math.sin(yaw)) + 0.25 * Math.abs(Math.cos(yaw));
+  colliders.push({ minX: x - ex, maxX: x + ex, minZ: z - ez, maxZ: z + ez });
 }
 
 // --- 미디어 룸 스크린 (P3-1) — 벽면 16:9 패널 + 얇은 어두운 프레임 ----------------

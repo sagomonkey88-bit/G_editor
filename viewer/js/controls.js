@@ -13,6 +13,7 @@ const PITCH_UP_MAX = 1.43;             // 위 약 82° (완전 수직 제외 —
 const PITCH_DOWN_MAX = -0.6;           // 아래 약 34°
 const PITCH_DEFAULT = -0.23;           // 기존 프레이밍과 동등한 살짝 내려다보기
 const FLOOR_Y = 0.35, CEIL_SAFE = 3.3; // 카메라 바닥/보수적 천장 한계
+const SIT_Y = 0.32;                    // P3-2 착석 시 아바타 높이(좌석에 앉은 느낌)
 
 export class PlayerControls {
   constructor(avatar, camera, colliders, dom, opts = {}) {
@@ -30,6 +31,7 @@ export class PlayerControls {
     this.camPos = new THREE.Vector3();
     this.enabled = true;
     this.moving = false;
+    this.seated = false; // P3-2 착석 상태
     this.keys = new Set();
     this.joy = { active: false, x: 0, y: 0 };   // 모바일 조이스틱 (-1..1)
     this._drag = { on: false, px: 0, py: 0, moved: 0 };
@@ -141,6 +143,27 @@ export class PlayerControls {
     this._follow(100); // dt 크게 → 감쇠 계수 ≈1, 카메라 하드 스냅
   }
 
+  // P3-2: 벤치 착석 — 스크린(yaw) 향해 앉고 카메라 보정. 이동 입력 시 자동 일어나기.
+  sit(x, z, yaw) {
+    this.seated = true;
+    this.pos.set(x, z);
+    this.avatarYaw = yaw; this.camYaw = yaw;
+    this.avatar.rotation.y = yaw;
+    this.camPitch = -0.02;              // 살짝 위 = 스크린 향함
+    this.camDistTarget = Math.min(this.camDistTarget, 2.6);
+    this.avatar.position.set(x, SIT_Y, z);
+    this._follow(100);
+  }
+  stand() {
+    if (!this.seated) return;
+    this.seated = false;
+    // 벤치 뒤(스크린 반대)로 물러나 벤치 콜라이더에서 벗어남
+    const f = this._forward(this.avatarYaw);
+    this.pos.set(this.pos.x - f.x * 0.85, this.pos.y - f.y * 0.85);
+    this.avatar.position.set(this.pos.x, 0, this.pos.y);
+    this.camDistTarget = CAM_DIST;
+  }
+
   _inputVector() {
     let fwd = 0, str = 0;
     const k = this.keys;
@@ -190,6 +213,18 @@ export class PlayerControls {
     }
 
     const inp = this._inputVector();
+    // P3-2: 착석 중 — 이동 입력이 있으면 일어나고, 없으면 앉은 자세 유지(카메라는 스크린 향함)
+    if (this.seated) {
+      if (Math.abs(inp.fwd) > 0.15 || Math.abs(inp.str) > 0.15) {
+        this.stand();
+      } else {
+        this.avatar.position.set(this.pos.x, SIT_Y, this.pos.y);
+        this.avatar.rotation.y = smoothAngle(this.avatar.rotation.y, this.avatarYaw, dt * 10);
+        if (this.avatar.userData.update) this.avatar.userData.update(dt, false, 0);
+        this._follow(dt);
+        return;
+      }
+    }
     const f = this._forward(this.camYaw), r = this._right(this.camYaw);
     let mx = f.x * inp.fwd + r.x * inp.str;
     let mz = f.y * inp.fwd + r.y * inp.str;

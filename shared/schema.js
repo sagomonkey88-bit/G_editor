@@ -396,6 +396,37 @@ export function makeArtwork(overrides = {}) {
   };
 }
 
+// P3-2(v1.6): 미디어 룸 벤치 자동 배치 — 스크린을 바라보는 그리드(방 크기에 따라 1~3줄).
+// 반환 [{ x, z, yaw }] (yaw = 아바타가 스크린을 향하는 방향). rect = computeLayout 의 방 rect.
+const SCREEN_DIR = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] }; // 스크린 벽 향하는 단위벡터
+export function generateBenches(room, rect) {
+  const s = room?.screen;
+  if (!s || !rect) return [];
+  const wall = s.wall || 'north';
+  const dir = SCREEN_DIR[wall] || SCREEN_DIR.north;
+  const yaw = +Math.atan2(dir[0], dir[1]).toFixed(3); // 스크린 향함
+  const cx = (rect.xMin + rect.xMax) / 2, cz = (rect.zMin + rect.zMax) / 2;
+  const w = rect.xMax - rect.xMin, d = rect.zMax - rect.zMin;
+  const horiz = (wall === 'north' || wall === 'south'); // 스크린 벽 수평 → 열=x축, 줄=z축
+  const colSpan = horiz ? w : d;   // 스크린과 평행(관람석 폭)
+  const rowSpan = horiz ? d : w;   // 스크린 방향 깊이
+  const cols = Math.max(1, Math.min(4, Math.floor((colSpan - 1.6) / 2.1)));
+  const rows = Math.max(1, Math.min(3, Math.floor((rowSpan - 3.5) / 1.5)));
+  const colStep = (colSpan - 1.4) / cols;
+  const benches = [];
+  for (let ri = 0; ri < rows; ri++) {
+    const rd = rowSpan * 0.42 + ri * 1.5; // 스크린 벽에서의 거리(중후방부터 뒤로)
+    for (let ci = 0; ci < cols; ci++) {
+      const cp = -((cols - 1) / 2) * colStep + ci * colStep; // 폭 방향 중앙 정렬
+      let x, z;
+      if (horiz) { x = cx + cp; z = wall === 'north' ? rect.zMin + rd : rect.zMax - rd; }
+      else { z = cz + cp; x = wall === 'west' ? rect.xMin + rd : rect.xMax - rd; }
+      benches.push({ x: +x.toFixed(2), z: +z.toFixed(2), yaw });
+    }
+  }
+  return benches;
+}
+
 // P3(v1.6): 미디어 룸 스크린 — 16:9 고정, 벽면 배치. 부재=스크린 없음.
 export function makeScreen(overrides = {}) {
   return {

@@ -162,10 +162,14 @@
 - [x] 검증: 미디어 전환→어두운 조명·스크린 렌더(south벽), 스크린 UI, layoutAll 제외(plans 1), 콘솔 클린. (finale 은 P4)
 - [x] 커밋 `feat(v1.6): P3-1 …`
 
-## P3-2. 벤치 + 착석
-- [ ] 스크린 배치 시 스크린 바라보는 벤치 자동(방 폭 1~3줄), 수동 이동/삭제/추가. 절차적 저폴리 공유 지오
-- [ ] 착석: Interactions 패턴(근접+E/탭) → 좌석 높이 idle 포즈·카메라 스크린 향함·이동입력=일어나기 (4종 단순 포즈)
-- [ ] 커밋 `feat(v1.6): P3-2 …`
+## P3-2. 벤치 + 착석 ✅ (커밋 완료)
+- [x] schema `generateBenches(room,rect)`: 스크린 향한 그리드(방 크기 따라 1~3줄×열). world.js 가 room.benches 없으면 폴백 자동 생성 → 스크린 배치 시 벤치 자동. 절차적 저폴리 공유 지오(makeBenchAssets/addBenchAt), 회전 반영 콜라이더
+- [x] world.js benchAnchors 반환. controls.sit/stand + update 착석 분기(이동입력>0.15=일어나기, camPitch/거리 스크린 보정, SIT_Y 0.32)
+- [x] viewer/js/seating.js 신설(manifest 등록): 근접 1.6m 프롬프트(zoom-prompt 재사용)+E/탭 착석, ESC·이동=일어나기. main.js 배선(enterGallery 생성·animate update·rebuild 재부착+seated 시 stand)
+- [x] 착석 시 아바타 좌석 높이 idle·스크린 향함, 카메라 스크린 향함(4종 단순 포즈 — 관절 다리 없음)
+- [x] 검증: 미디어룸 12벤치 스크린 향한 극장 배치, 프롬프트·E 착석(seated·y0.32·yaw 스크린), 착석뷰 스크린 정면, W 이동→일어남, 콘솔 클린
+- [x] 참고: 벤치 수동 이동/삭제/추가 UI 는 후속(현재 자동 배치·데이터화는 지원, room.benches 저장 시 우선)
+- [x] 커밋 `feat(v1.6): P3-2 …`
 
 ## P3-3. 영상 소스 (업로드)
 - [ ] mp4/webm 업로드 → VideoTexture 스크린 렌더, 100MB 초과 차단 + 용량/유튜브 안내, 음소거 자동재생
