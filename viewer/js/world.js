@@ -207,6 +207,15 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
   const oneWayColliders = [];
   for (const ow of oneWayDoors) buildOneWayPatch(group, oneWayColliders, project, layout, ow, patternImages);
 
+  // ---- 미디어 룸 스크린 (P3-1) — 16:9 패널 + 어두운 프레임. 영상 소스는 P3-3 ----
+  const screens = [];
+  for (const r of rects) {
+    if (r.isLobby || !r.room) continue;
+    if ((r.room.roomType || 'gallery') !== 'media' || !r.room.screen) continue;
+    const sc = buildScreen(group, r.rect, r.room);
+    if (sc) screens.push({ ...sc, roomId: r.id });
+  }
+
   // ---- 벤치 (decor.benches) ----
   for (const r of rects) {
     if (r.isLobby || !r.room?.decor?.benches) continue;
@@ -239,7 +248,37 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
   // ---- 텍스트 오브젝트 (v1.3 P4 — 타이틀월/섹션 패널 포함 자유 배치) ----
   buildTexts(group, project, layout);
 
-  return { group, colliders, rects, moodLights, oneWayColliders };
+  return { group, colliders, rects, moodLights, oneWayColliders, screens };
+}
+
+// --- 미디어 룸 스크린 (P3-1) — 벽면 16:9 패널 + 얇은 어두운 프레임 ----------------
+// 반환 { panel(메쉬), room } — 영상 텍스처(P3-3)가 panel.material.map 을 채운다.
+const SCREEN_BASE_W = 3.2; // scale 1 기준 폭(m), 16:9
+function buildScreen(group, rect, room) {
+  const s = room.screen;
+  const wall = s.wall || 'north';
+  const wallH = room.size.h;
+  const len = wallLength(rect, wall);
+  const w = Math.min(SCREEN_BASE_W * (s.scale || 1), len - 0.4);
+  const h = w * 9 / 16;
+  const offset = typeof s.position === 'number' ? s.position : len / 2;
+  const t = Math.max(w / 2 + 0.1, Math.min(len - w / 2 - 0.1, offset));
+  const at = wallLeftToWorld(rect, wall, t);
+  const [nx, nz] = TEXT_WALL_NORMAL[wall];
+  const rot = TEXT_WALL_ROT[wall];
+  const off = T / 2 + 0.02;
+  const cy = Math.min(Math.max(h / 2 + 0.5, 1.55), wallH - h / 2 - 0.3);
+  // 프레임(살짝 뒤) + 패널(살짝 앞)
+  const frame = new THREE.Mesh(new THREE.PlaneGeometry(w + 0.14, h + 0.14),
+    new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.55, metalness: 0.2 }));
+  frame.position.set(at.x + nx * off, cy, at.z + nz * off); frame.rotation.y = rot;
+  group.add(frame);
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+    new THREE.MeshBasicMaterial({ color: 0x0c0e13 })); // 영상 없으면 어두운 플레이스홀더
+  panel.position.set(at.x + nx * (off + 0.012), cy, at.z + nz * (off + 0.012)); panel.rotation.y = rot;
+  panel.userData.screen = true;
+  group.add(panel);
+  return { panel, room, center: { x: at.x, y: cy, z: at.z }, wall, w, h };
 }
 
 // --- 단방향 문 숨김 쪽 패치 (P1-2) ------------------------------------------

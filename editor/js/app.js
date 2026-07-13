@@ -4,7 +4,7 @@ import { LibraryPanel } from './libraryPanel.js';
 import { Inspector } from './inspector.js';
 import { PlanView } from './planView.js';
 import { ElevationView } from './elevationView.js';
-import { PRESETS, RANGES, LOBBY_RANGES, makeRoom, makeText, computeLayout, wallLength, wallLeftToWorld, LAYOUT, findOppositeFace, doorCovered } from '../../shared/schema.js';
+import { PRESETS, RANGES, LOBBY_RANGES, makeRoom, makeScreen, makeText, computeLayout, wallLength, wallLeftToWorld, LAYOUT, findOppositeFace, doorCovered } from '../../shared/schema.js';
 import { openPreview } from './previewBridge.js';
 import { LivePreview } from './livePreview.js';
 import { exportPublishZip } from './exporter.js';
@@ -275,6 +275,8 @@ function renderRoomProps() {
   const scaleSetting = store.project.autoLayout?.scaleSetting ?? 3.5;
   const hasAutoOverride = !isLobby && typeof room.autoScale === 'number';
   const effScale = isLobby ? scaleSetting : effectiveScale(store.project, room);
+  // P3: 방 타입 — gallery(기본)|media. (finale 은 P4)
+  const roomType = isLobby ? 'gallery' : (room.roomType || 'gallery');
   // P1-4: 출구 문은 모든 방(로비 제외)에서 설치 가능 — 마지막 방 제한 해제.
   const doorLayout = isLobby ? null : computeLayout(store.project);
   const doorConnected = !isLobby && room.exitDoor
@@ -291,6 +293,20 @@ function renderRoomProps() {
     </div>
     <div class="field"><label>높이 H (${R.h.join('–')}m)</label><input type="number" step="0.1" data-size="h" value="${room.size.h}"></div>
     ${isLobby ? '' : `
+    <div class="field"><label>방 타입</label>
+      <div class="seg" data-room-type>
+        <button data-v="gallery" class="${roomType === 'gallery' ? 'on' : ''}">일반 전시실</button>
+        <button data-v="media" class="${roomType === 'media' ? 'on' : ''}">미디어 룸</button>
+      </div></div>
+    ${roomType === 'media' && room.screen ? `
+    <div class="panel-title" style="margin-top:14px">미디어 스크린 (16:9)</div>
+    <div class="hint-note">미디어 룸은 조명이 자동으로 어두워집니다. 영상 업로드는 다음 단계에서 추가됩니다.</div>
+    <div class="field"><label>스크린 벽</label>
+      <div class="seg" data-screen-wall>${PRESETS.wallDir.map(w => `<button data-v="${w}" class="${room.screen.wall === w ? 'on' : ''}">${DIR_KO[w]}</button>`).join('')}</div></div>
+    <div class="field"><label>위치 offset (m · 비우면 중앙)</label><input type="number" step="0.1" data-screen-pos value="${room.screen.position ?? ''}"></div>
+    <div class="field"><label>배율 <b class="screen-scale-lbl">${(room.screen.scale ?? 1).toFixed(2)}</b>x</label>
+      <input type="range" data-screen-scale min="0.5" max="2.5" step="0.05" value="${room.screen.scale ?? 1}"></div>` : ''}`}
+    ${isLobby || roomType !== 'gallery' ? '' : `
     <div class="panel-title" style="margin-top:14px">자동 배치</div>
     <div class="field"><label>기본 배율 <b class="auto-scale-lbl">${scaleSetting}x</b> (${AUTO_SCALE_RANGE.join('–')}) · 전역</label>
       <input type="range" data-auto-scale min="${AUTO_SCALE_RANGE[0]}" max="${AUTO_SCALE_RANGE[1]}" step="0.1" value="${scaleSetting}"></div>
@@ -410,6 +426,26 @@ function renderRoomProps() {
     upd(r => { if (r.exitDoor) r.exitDoor.displayDir = b.dataset.v; }, { silent: false });
     renderRoomProps();
   });
+  // P3: 방 타입 전환 (미디어 룸 → 스크린 생성 + P2 조명 자동 어두움) / 스크린 컨트롤
+  root.querySelector('[data-room-type]')?.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const v = b.dataset.v;
+    upd(r => {
+      if (v === 'gallery') { delete r.roomType; delete r.screen; }
+      else {
+        r.roomType = v;
+        if (v === 'media') {
+          r.screen = r.screen || makeScreen({ wall: 'north' });
+          r.ceiling = r.ceiling || {};
+          if ((r.ceiling.lightIntensity ?? 1) >= 0.9) r.ceiling.lightIntensity = 0.3; // 자동 어두움
+        }
+      }
+    }, { silent: false });
+    renderRoomProps(); renderAtmosphere();
+  });
+  root.querySelector('[data-screen-wall]')?.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { upd(r => { if (r.screen) r.screen.wall = b.dataset.v; }, { silent: false }); renderRoomProps(); } });
+  root.querySelector('[data-screen-pos]')?.addEventListener('input', e => upd(r => { if (r.screen) { const v = parseFloat(e.target.value); r.screen.position = isFinite(v) ? v : null; } }, { coalesce: `screen.pos:${room.id}` }));
+  root.querySelector('[data-screen-scale]')?.addEventListener('input', e => { upd(r => { if (r.screen) r.screen.scale = parseFloat(e.target.value); }, { coalesce: `screen.scale:${room.id}` }); const l = root.querySelector('.screen-scale-lbl'); if (l) l.textContent = parseFloat(e.target.value).toFixed(2); });
   const ew = root.querySelector('[data-exit-wall]');
   if (ew) ew.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; upd(r => { r.exitDoor = r.exitDoor || { offset: 3 }; r.exitDoor.wall = b.dataset.v; }, { silent: false }); renderRoomProps(); });
   const eo = root.querySelector('[data-exit-offset]');

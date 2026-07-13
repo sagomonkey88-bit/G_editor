@@ -285,6 +285,8 @@ export function ensureSectionText(project, roomId) {
 export function layoutRoom(store, roomId, opts = {}) {
   const idx = store.project.rooms.findIndex(r => r.id === roomId);
   if (idx < 0) return null;
+  // P3: 미디어/피날레 룸은 자동 배치 대상 제외 (영상 전용/체험 공간)
+  if ((store.project.rooms[idx].roomType || 'gallery') !== 'gallery') return null;
   const plan = computeRoomPlan(store.project, roomId, opts);
   if (!plan) return null;
   store.mutate(p => {
@@ -301,11 +303,12 @@ export function layoutAll(store, opts = {}) {
   const plans = [];
   store.mutate(p => {
     for (const room of p.rooms) {
+      if ((room.roomType || 'gallery') !== 'gallery') continue; // P3: 미디어/피날레 제외
       const plan = computeRoomPlan(p, room.id, opts);
       if (plan) { applyRoomPlan(p, plan); plans.push(plan); }
     }
-    reflowOrigins(p, 0); // 전체 재배치
-    for (const room of p.rooms) ensureSectionText(p, room.id); // B2
+    reflowOrigins(p, 0); // 전체 재배치 (미디어/피날레도 문 체인 위치는 유지)
+    for (const room of p.rooms) if ((room.roomType || 'gallery') === 'gallery') ensureSectionText(p, room.id); // B2
   }, { detail: { autoLayoutAll: true } });
   store.breakCoalesce();
   return plans;

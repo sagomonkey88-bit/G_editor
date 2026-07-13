@@ -396,6 +396,19 @@ export function makeArtwork(overrides = {}) {
   };
 }
 
+// P3(v1.6): 미디어 룸 스크린 — 16:9 고정, 벽면 배치. 부재=스크린 없음.
+export function makeScreen(overrides = {}) {
+  return {
+    source: overrides.source === 'youtube' ? 'youtube' : 'upload', // 'upload'(mp4/webm) | 'youtube'(후속)
+    file: overrides.file || '',       // 업로드 영상 asset id
+    videoId: overrides.videoId || '', // 유튜브 영상 id (후속)
+    wall: overrides.wall || 'north',
+    position: typeof overrides.position === 'number' ? overrides.position : null, // 벽 offset(m), null=중앙
+    scale: overrides.scale ?? 1,
+    autoplay: overrides.autoplay !== false,
+  };
+}
+
 export function makeRoom(overrides = {}, index = 0) {
   const id = overrides.id || uid('room');
   const wallFaces = overrides.wallFaces; // P3 면 단위 오버라이드 보존
@@ -404,6 +417,9 @@ export function makeRoom(overrides = {}, index = 0) {
     ...(overrides.origin ? { origin: { x: overrides.origin.x, z: overrides.origin.z } } : {}), // P2 자유 배치 좌표
     ...(overrides.autoScale != null ? { autoScale: overrides.autoScale } : {}), // A2 방별 배율 오버라이드
     ...(overrides.texts ? { texts: overrides.texts } : {}), // P4 텍스트 오브젝트 보존
+    // P3(v1.6): 방 타입 — 부재=gallery. media/finale 만 명시 저장(구 프로젝트 외관 불변).
+    ...(overrides.roomType && overrides.roomType !== 'gallery' ? { roomType: overrides.roomType } : {}),
+    ...(overrides.screen ? { screen: makeScreen(overrides.screen) } : {}),
     id,
     name: overrides.name || `${index + 1}. 새 섹션`,
     intro: overrides.intro || '',

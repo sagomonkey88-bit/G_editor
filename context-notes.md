@@ -167,4 +167,17 @@
 
 ## 검증 인프라 (재확인)
 - `node _devserver.mjs`(포트 8777) 또는 launch.json museum-dev-2(8778, 다른 세션이 8777 점유 시). 에디터 …/editor/index.html, 뷰어 …/viewer/index.html?src=../samples/vincent-demo/museum.json
-- 신규 뷰어 파일 추가 시 viewer/manifest.json 등록 필수(exporter 가 manifest 기준 복사). v1.6 은 기존 파일 수정만 예상 → manifest 변경 없음.
+- 신규 뷰어 파일 추가 시 viewer/manifest.json 등록 필수(exporter 가 manifest 기준 복사). P1~P2 는 기존 파일 수정만 → manifest 변경 없음. P3 신규 모듈(스크린/착석/플레이어) 추가 시 manifest 등록 필수.
+- 프리뷰 스크린샷 rAF 타임아웃 우회: `renderer.render`+`canvas.toDataURL` 로 캡처(이번 세션은 _devserver 에 임시 POST /__capture 추가 후 검증 끝나고 원복 — 재사용하려면 다시 추가).
+
+# v1.6 P3 컨텍스트 노트 (미디어 룸)
+
+## 결정 (사용자 진행 지시 + 확인 질문 스킵 → 권장 기본값)
+- **영상 = 직접 업로드(mp4/webm)만 이번 구현.** 유튜브(CSS3DRenderer 벤더링 + YouTube IFrame API·온라인 전용)는 스키마/UI 자리만 남기고 후속 세션. 이유: 외부 의존성 0·오프라인 안전·내보내기 ZIP 외부요청 0 유지, 스펙 P3-3 이 "CSS3D 1순위, 문제 크면 폴백 허용"이라 단계적 접근 정합.
+- **이번 세션 = P3 완성 집중, P4 는 새 세션**(스펙+요약 인계).
+- 착석 포즈: 아바타 4종은 관절 다리 없는 둥근 체형(avatar.js — feet=구, leg 조인트 없음) → 스펙 허용대로 **단순 포즈**(좌석 높이 배치 + idle, 카메라 스크린 향함). 착석 상호작용은 기존 `Interactions`(interact.js: 근접 2.2m+시선±35°, E/탭, controls.enabled 잠금) 패턴 재사용.
+
+## 구조 파악
+- 방 타입은 schema `room.roomType` 신설(부재=gallery). 자동배치 `layoutAll`/`layoutRoom`(autoLayout.js)은 p.rooms 순회 → 비 gallery 는 computeRoomPlan/ensureSectionText 건너뜀(reflowOrigins 은 유지 — 위치·문 체인 참여). 텔레포트 destinations(teleport.js)는 방 순서 그대로 = 미디어/피날레 포함(현행).
+- 미디어룸 어둠 = **P2 `ceiling.lightIntensity`** 재사용(범용 방 조명). roomType='media' 로 만들 때 기본 낮은 값 세팅.
+- 스크린/벤치 = world.js 절차 생성(P2 소품 방식 공유 지오). 스크린 16:9 고정, 벽면 배치(도어/텍스트 오브젝트처럼 wallLeftToWorld + 벽 법선 오프셋).
