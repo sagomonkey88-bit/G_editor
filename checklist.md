@@ -118,15 +118,16 @@
 - [x] 검증: 마지막 방 토글로 문 생성+자동 연결(south→room0), 연결됨 표시. connect picker: 연결된 방 차단(toast·미이동), 미연결 방 confirm→이동(overlap 0). 콘솔 클린
 - [x] 커밋 `feat(v1.6): P1-4 …`
 
-## P1-2. 단방향 문
-- [ ] schema.js: `exitDoor.displayDir: 'both'|'a'|'b'` (기본 both, 구 프로젝트 외관 불변)
-- [ ] world.js: 숨김 쪽 단면 벽 패치(벽 스타일 + 걸레받이·몰딩 연속), 표시 쪽은 일반 문
-- [ ] controls.js: 단방향 콜라이더(숨김→표시 차단, 표시→숨김 통과)
-- [ ] placementRules.js/autoLayout.js: 문 회피에서 숨김 쪽은 벽 취급(작품 걸기 허용)
-- [ ] planView.js: 반쪽 화살표 아이콘으로 단방향 구분
-- [ ] 텔레포트(T) 문 방향 무관 동작 확인 (현행 유지)
-- [ ] 검증: 1↔11 "11번에서만 보임" → 1번에서 완전한 벽(통과 불가·몰딩 연속·작품 걸기), 11번에서 문·통과, 라운드트립
-- [ ] 커밋 `feat(v1.6): P1-2 …`
+## P1-2. 단방향 문 ✅ (커밋 완료)
+- [x] schema.js: `doorHiddenSide(wall, displayDir)` — displayDir 'both'|'a'(이 방)|'b'(건너편). 부재/both = 외관 불변
+- [x] world.js: 개구부는 뚫되 숨김 쪽 단면 벽 패널(벽면 flush)+걸레받이·상단 몰딩 스트립(FrontSide, 숨김 방 향함) → 완전한 벽. 단방향은 문틀(frame) 생략(숨김 쪽 티 방지). oneWayColliders 반환
+- [x] controls.js: `_oneWayHit` — 숨김 쪽에서 보이는 쪽으로 넘는 이동만 차단(벽처럼 R 에서 멈춤), 보이는→숨김 통과. main.js 가 controls 에 전달(생성·rebuild)
+- [x] autoLayout.js `usableWalls`: displayDir 'b'(이 방에서 숨김)면 그 벽 작품 허용. elevationView `_door`: 'b'면 이 방에서 문 미표시(작품 회피 없음)
+- [x] planView.js: 단방향 = 한쪽 화살표(통행 방향) + 반쪽 디스크(평평면 숨김 쪽)
+- [x] app.js: 문 표시 방향 세그(양방향/이 방만/건너편만) + 안내
+- [x] 텔레포트 목적지 목록은 방 순서 그대로(문 방향 무관 — 현행 유지)
+- [x] 검증(viewer rebuild): oneWayColliders 1개, 충돌 hidden→visible 차단·visible→hidden 통과·슬라이드 허용. 숨김 쪽=연속 벽(문틀 없음·몰딩 이어짐, 각도뷰 확인), 보이는 쪽=열린 문 통과. 플랜 단방향 마커. usableWalls 'b' 북벽 개방. 콘솔 클린
+- [x] 커밋 `feat(v1.6): P1-2 …`
 
 ## P2. 천장 시스템
 - [ ] schema.js: `ceilingStyle{color,lightIntensity,fixture,muralImage}` + normalize/ensure (기본 color #ece4d6, lightIntensity 1.0 = 현행)

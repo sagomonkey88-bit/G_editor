@@ -529,7 +529,9 @@ export class ElevationView {
     if (room.id === '__lobby__') {
       return this.wall === 'north' ? { offset: this._wallLen() / 2 } : null;
     }
-    return (room.exitDoor && room.exitDoor.wall === this.wall) ? room.exitDoor : null;
+    // P1-2: displayDir 'b'(건너편만 보임)면 이 방(소유 방)에서는 벽 → 문 미표시 + 작품 회피 없음
+    if (room.exitDoor && room.exitDoor.wall === this.wall && room.exitDoor.displayDir !== 'b') return room.exitDoor;
+    return null;
   }
 
   _roomRef(p) { return this.room.id === '__lobby__' ? p.lobby : p.rooms.find(r => r.id === this.room.id); }

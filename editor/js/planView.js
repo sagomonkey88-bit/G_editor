@@ -270,7 +270,7 @@ export class PlanView {
     const door = room.exitDoor;
     const valid = doorCovered(this.layout, room.id, door.wall, door.offset)
       && !this._doorOverlapsOthers(rect, door.wall, door.offset, room.id);
-    const c = this._doorMarker(rect, door.wall, door.offset, { on, valid });
+    const c = this._doorMarker(rect, door.wall, door.offset, { on, valid, displayDir: door.displayDir || 'both' });
     if (on) this._doorHandle = { x: c.cx, y: c.cy, rect, wall: door.wall, roomId: room.id };
   }
 
@@ -283,7 +283,7 @@ export class PlanView {
 
   // P1-3: 문 마커 렌더 — 개구부 띠 + 통행 방향 화살표 + 중심 마커. 반환 { cx, cy }(핸들 좌표).
   // 줌 무관 최소 크기 보장. displayDir(P1-2) 는 이후 항목에서 반쪽/한쪽 화살표로 확장.
-  _doorMarker(rect, wall, offset, { on = false, valid = true } = {}) {
+  _doorMarker(rect, wall, offset, { on = false, valid = true, displayDir = 'both' } = {}) {
     const g = this.ctx;
     const len = wallLength(rect, wall);
     const t = Math.max(0, Math.min(len, offset));
@@ -312,10 +312,13 @@ export class PlanView {
     g.strokeStyle = col; g.lineWidth = DOOR_MARK.spanW; g.lineCap = 'round';
     g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
     g.lineCap = 'butt';
-    // 통행 방향 화살표 (벽 수직 양쪽 — 양방향 문)
+    // 통행 방향 화살표 — 양방향=양쪽, 단방향=보이는→숨김 한쪽. (+n = 소유 방 안쪽)
+    // displayDir 'a'(이 방만 보임): 통행 이 방→건너편 = -n / 'b'(건너편만): 건너편→이 방 = +n
     const ux = dx / sl, uy = dy / sl, nx = -uy, ny = ux;
+    const oneWay = displayDir === 'a' || displayDir === 'b';
+    const sides = !oneWay ? [1, -1] : (displayDir === 'a' ? [-1] : [1]);
     g.fillStyle = col; g.strokeStyle = col; g.lineWidth = 2.5;
-    for (const s of [1, -1]) {
+    for (const s of sides) {
       const x0 = cx + nx * s * DOOR_MARK.arrowGap, y0 = cy + ny * s * DOOR_MARK.arrowGap;
       const x1 = cx + nx * s * (DOOR_MARK.arrowGap + DOOR_MARK.arrowLen), y1 = cy + ny * s * (DOOR_MARK.arrowGap + DOOR_MARK.arrowLen);
       g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
@@ -326,9 +329,16 @@ export class PlanView {
       g.lineTo(x1 - nx * s * w2 - ux * w2, y1 - ny * s * w2 - uy * w2);
       g.closePath(); g.fill();
     }
-    // 중심 마커
+    // 중심 마커 — 단방향은 반쪽 디스크(평평한 면이 숨김 쪽), 양방향은 원
+    const rad = on ? DOOR_MARK.dotSel : DOOR_MARK.dot;
     g.fillStyle = col; g.strokeStyle = '#14171c'; g.lineWidth = 1.5;
-    g.beginPath(); g.arc(cx, cy, on ? DOOR_MARK.dotSel : DOOR_MARK.dot, 0, 7); g.fill(); g.stroke();
+    if (oneWay) {
+      const passSign = sides[0]; // 통행(보이는→숨김) 방향 = 숨김 쪽
+      const ha = Math.atan2(ny * passSign, nx * passSign); // 숨김 방향 각도
+      g.beginPath(); g.arc(cx, cy, rad, ha + Math.PI / 2, ha + 3 * Math.PI / 2); g.closePath(); g.fill(); g.stroke();
+    } else {
+      g.beginPath(); g.arc(cx, cy, rad, 0, 7); g.fill(); g.stroke();
+    }
     return { cx, cy };
   }
 

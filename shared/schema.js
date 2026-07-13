@@ -611,6 +611,21 @@ export function reflowOrigins(project, start = 0) {
   return project;
 }
 
+// --- P1-2(v1.6): 단방향 문 — 소유 방 기준 숨김 쪽 계산 ------------------------
+// displayDir: 'both'(기본) | 'a'(이 방=소유 방에서만 보임) | 'b'(건너편 방에서만 보임).
+// 통행은 "보이는 쪽 → 숨김 쪽"만 허용(숨김 쪽에서 접근 시 벽). 숨김 쪽은 벽으로 렌더·충돌.
+// 반환 { axis:'H'|'V', hiddenSign } — hiddenSign = 숨김 쪽의 경계선(fixed) 기준 좌표 부호.
+//   axis 'H' → z축, 'V' → x축. 양방향/부재면 null.
+const DOOR_OUT_SIGN = { north: -1, south: 1, east: 1, west: -1 }; // 소유 방 밖(건너편) 방향 부호
+export function doorHiddenSide(wall, displayDir) {
+  if (!displayDir || displayDir === 'both') return null;
+  const outSign = DOOR_OUT_SIGN[wall];
+  if (outSign == null) return null;
+  const axis = (wall === 'north' || wall === 'south') ? 'H' : 'V';
+  const hiddenSign = displayDir === 'a' ? outSign : -outSign; // a: 숨김=건너편, b: 숨김=이 방 안쪽
+  return { axis, hiddenSign };
+}
+
 // --- P2: 문 유효성 — 문 스팬이 경계선 반대편 인접 공간으로 완전히 덮이는가 ----
 // selfId: '__lobby__' 또는 room id. 벽 범위를 벗어난 문도 무효.
 export function doorCovered(layout, selfId, wall, offset, doorW = LAYOUT.DOOR_W) {

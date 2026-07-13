@@ -75,7 +75,8 @@ export function entranceWallOf(project, roomId) {
 // 작품을 걸 벽 목록 — 입구/출구 벽 제외, 입구 다음부터 시계(또는 반시계) 순서.
 export function usableWalls(project, room, clockwise = true) {
   const entrance = entranceWallOf(project, room.id);
-  const exit = room.exitDoor?.wall || null;
+  // P1-2: 이 방에서 숨김인 단방향 문(displayDir 'b')은 벽 취급 → 작품 걸기 허용(회피 안 함)
+  const exit = (room.exitDoor && room.exitDoor.displayDir !== 'b') ? room.exitDoor.wall : null;
   const block = new Set([entrance, exit].filter(Boolean));
   const ring = clockwise ? WALL_CW : WALL_CCW;
   const start = entrance ? (ring.indexOf(entrance) + 1) % 4 : 0;

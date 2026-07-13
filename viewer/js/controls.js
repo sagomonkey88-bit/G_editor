@@ -19,6 +19,7 @@ export class PlayerControls {
     this.avatar = avatar;
     this.camera = camera;
     this.colliders = colliders;
+    this.oneWayColliders = opts.oneWayColliders || []; // P1-2: 단방향 문 (숨김→보이는 쪽 통행 차단)
     this.dom = dom;
     this.pos = new THREE.Vector2(opts.spawnX || 0, opts.spawnZ || 0);
     this.camYaw = Math.PI;        // 북(-Z)을 바라봄
@@ -161,6 +162,24 @@ export class PlayerControls {
     return false;
   }
 
+  // P1-2: 단방향 문 통행 판정. 숨김 쪽(hiddenSign 방향)에서 보이는 쪽으로 넘는 이동만 차단
+  // (숨김 쪽에서는 벽처럼 R 지점에서 멈춤). 보이는 쪽→숨김 쪽 통과는 허용.
+  _oneWayHit(nx, nz, ox, oz) {
+    const R = RADIUS;
+    for (const c of this.oneWayColliders) {
+      if (c.axis === 'H') {
+        if (nx < c.lo - R || nx > c.hi + R) continue;
+        const dOld = (oz - c.fixed) * c.hiddenSign, dNew = (nz - c.fixed) * c.hiddenSign;
+        if (dOld > 0 && dNew < dOld && dNew < R) return true;
+      } else {
+        if (nz < c.lo - R || nz > c.hi + R) continue;
+        const dOld = (ox - c.fixed) * c.hiddenSign, dNew = (nx - c.fixed) * c.hiddenSign;
+        if (dOld > 0 && dNew < dOld && dNew < R) return true;
+      }
+    }
+    return false;
+  }
+
   update(dt) {
     this._t += dt;
     if (!this.enabled) {
@@ -181,9 +200,9 @@ export class PlayerControls {
       mx /= len; mz /= len;
       const speed = (inp.run ? RUN : WALK) * Math.min(1, len);
       let nx = this.pos.x + mx * speed * dt;
-      if (!this._circleHit(nx, this.pos.y)) this.pos.x = nx;
+      if (!this._circleHit(nx, this.pos.y) && !this._oneWayHit(nx, this.pos.y, this.pos.x, this.pos.y)) this.pos.x = nx;
       let nz = this.pos.y + mz * speed * dt;
-      if (!this._circleHit(this.pos.x, nz)) this.pos.y = nz;
+      if (!this._circleHit(this.pos.x, nz) && !this._oneWayHit(this.pos.x, nz, this.pos.x, this.pos.y)) this.pos.y = nz;
       this.avatarYaw = Math.atan2(mx, mz);
     }
 

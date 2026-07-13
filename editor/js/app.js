@@ -307,6 +307,14 @@ function renderRoomProps() {
     <div class="field"><label>문 벽</label>
       <div class="seg" data-exit-wall>${PRESETS.wallDir.map(w => `<button data-v="${w}" class="${room.exitDoor.wall === w ? 'on' : ''}">${DIR_KO[w]}</button>`).join('')}</div></div>
     <div class="field"><label>문 위치 offset (m)</label><input type="number" step="0.1" data-exit-offset value="${room.exitDoor.offset ?? 3}"></div>
+    <div class="field"><label>표시 방향 (단방향 문)</label>
+      <div class="seg" data-door-dir>
+        <button data-v="both" class="${(room.exitDoor.displayDir || 'both') === 'both' ? 'on' : ''}">양방향</button>
+        <button data-v="a" class="${room.exitDoor.displayDir === 'a' ? 'on' : ''}">이 방만</button>
+        <button data-v="b" class="${room.exitDoor.displayDir === 'b' ? 'on' : ''}">건너편만</button>
+      </div></div>
+    ${(room.exitDoor.displayDir && room.exitDoor.displayDir !== 'both')
+      ? `<div class="hint-note">단방향 — ${room.exitDoor.displayDir === 'a' ? '이 방' : '건너편 방'}에서만 문이 보이고 통과됩니다. 반대쪽은 벽(작품 걸기 가능).</div>` : ''}
     ${doorConnected
       ? `<div class="hint-note">→ ${attr(doorOpp?.name || '인접 공간')}과(와) 연결됨</div>`
       : `<div class="hint-note" style="color:var(--danger)">이 벽에 인접한 공간이 없어 개구부가 생기지 않습니다.</div>
@@ -393,6 +401,11 @@ function renderRoomProps() {
     renderRoomProps();
   });
   root.querySelector('[data-connect-room]')?.addEventListener('click', () => connectRoomPicker(room));
+  root.querySelector('[data-door-dir]')?.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    upd(r => { if (r.exitDoor) r.exitDoor.displayDir = b.dataset.v; }, { silent: false });
+    renderRoomProps();
+  });
   const ew = root.querySelector('[data-exit-wall]');
   if (ew) ew.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; upd(r => { r.exitDoor = r.exitDoor || { offset: 3 }; r.exitDoor.wall = b.dataset.v; }, { silent: false }); renderRoomProps(); });
   const eo = root.querySelector('[data-exit-offset]');

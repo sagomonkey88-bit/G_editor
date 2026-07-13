@@ -8,7 +8,7 @@
 // 벽은 "라인 유니온" 방식으로 만든다: 모든 룸+로비의 4변을 같은 직선끼리 합쳐
 // 경계마다 벽을 딱 한 번만 생성 → 공유벽 이중생성/ z-fighting 없음. 문은 구멍으로 뺀다.
 import * as THREE from '../../vendor/three.module.js';
-import { LAYOUT, wallLeftToWorld, wallLength, wallFaceStyle, doorCovered, textBlocks } from '../../shared/schema.js';
+import { LAYOUT, wallLeftToWorld, wallLength, wallFaceStyle, doorCovered, doorHiddenSide, findOppositeFace, textBlocks } from '../../shared/schema.js';
 import { wallStyleTexture, floorStyleTexture, styledTextTexture, WALL_COLORS } from './textures.js';
 import { makeSpotlight } from './artwork.js';
 
@@ -98,10 +98,10 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
 
   // ---- 문 구멍 ----
   const openings = new Map();
-  const addOpening = (axis, fixed, center) => {
+  const addOpening = (axis, fixed, center, oneWay = false) => {
     const key = axis === 'H' ? hkey(fixed) : vkey(fixed);
     if (!openings.has(key)) openings.set(key, []);
-    openings.get(key).push({ center, width: LAYOUT.DOOR_W, height: LAYOUT.DOOR_H });
+    openings.get(key).push({ center, width: LAYOUT.DOOR_W, height: LAYOUT.DOOR_H, oneWay });
   };
   // 로비 → 전시 통로 (로비 북쪽 벽 중앙 고정) — P2: 룸이 맞닿아 있을 때만 개구부
   const lobbyCx = (layout.lobby.xMin + layout.lobby.xMax) / 2;
@@ -109,13 +109,16 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
     addOpening('H', layout.lobby.zMin, lobbyCx);
   }
   // 각 룸 exitDoor — P2: 무효 문(인접 공간 없음/벽 범위 밖)은 벽을 뚫지 않는다
+  const oneWayDoors = []; // P1-2: {rect, room, door} — 벽 생성 후 숨김 쪽 패치·콜라이더 생성
   for (let i = 0; i < layout.rooms.length; i++) {
     const room = project.rooms[i];
     if (!room.exitDoor) continue;
     if (!doorCovered(layout, room.id, room.exitDoor.wall, room.exitDoor.offset)) continue;
+    const oneWay = !!(room.exitDoor.displayDir && room.exitDoor.displayDir !== 'both');
     const d = wallLeftToWorld(layout.rooms[i].rect, room.exitDoor.wall, room.exitDoor.offset);
-    if (room.exitDoor.wall === 'north' || room.exitDoor.wall === 'south') addOpening('H', d.z, d.x);
-    else addOpening('V', d.x, d.z);
+    if (room.exitDoor.wall === 'north' || room.exitDoor.wall === 'south') addOpening('H', d.z, d.x, oneWay);
+    else addOpening('V', d.x, d.z, oneWay);
+    if (oneWay) oneWayDoors.push({ rect: layout.rooms[i].rect, room, door: room.exitDoor });
   }
 
   // ---- 벽 생성 ----
@@ -141,7 +144,7 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
 
   for (const [key, L] of lines) {
     const spans = mergeIvals(L.ivals);
-    const ops = (openings.get(key) || []).map(o => [o.center - o.width / 2, o.center + o.width / 2, o.height]);
+    const ops = (openings.get(key) || []).map(o => [o.center - o.width / 2, o.center + o.width / 2, o.height, o.oneWay]);
 
     for (const [s, e] of spans) {
       // 이 span 내 문 구멍
@@ -169,10 +172,14 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
         const { pos, neg } = claimsAt(L, (o[0] + o[1]) / 2);
         const wsPos = faceWS(pos) || faceWS(neg);
         const wsNeg = faceWS(neg) || faceWS(pos);
-        buildLintel(group, L.axis, L.fixed, o[0], o[1], o[2], L.height, wsPos, wsNeg);
+        buildLintel(group, L.axis, L.fixed, o[0], o[1], o[2], L.height, wsPos, wsNeg, o[3]);
       }
     }
   }
+
+  // ---- 단방향 문 숨김 쪽 패치 + 콜라이더 (P1-2) ----
+  const oneWayColliders = [];
+  for (const ow of oneWayDoors) buildOneWayPatch(group, oneWayColliders, project, layout, ow, patternImages);
 
   // ---- 벤치 (decor.benches) ----
   for (const r of rects) {
@@ -204,7 +211,59 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
   // ---- 텍스트 오브젝트 (v1.3 P4 — 타이틀월/섹션 패널 포함 자유 배치) ----
   buildTexts(group, project, layout);
 
-  return { group, colliders, rects, moodLights };
+  return { group, colliders, rects, moodLights, oneWayColliders };
+}
+
+// --- 단방향 문 숨김 쪽 패치 (P1-2) ------------------------------------------
+// 개구부는 뚫되(양쪽), 숨김 방을 향한 단면 벽 패널 + 걸레받이·상단 몰딩을 덧대
+// 숨김 쪽에서는 완전한 벽처럼(이음매 없이) 보이게 한다. 보이는 쪽에서는 back-face 컬링으로
+// 패널이 안 보여 열린 문 그대로. 통행 차단은 oneWayColliders(controls.js)가 담당.
+function buildOneWayPatch(group, oneWayColliders, project, layout, ow, patternImages) {
+  const { rect, room, door } = ow;
+  const hs = doorHiddenSide(door.wall, door.displayDir);
+  if (!hs) return;
+  const wallH = room.size.h;
+  const c = wallLeftToWorld(rect, door.wall, door.offset);
+  const horiz = (door.wall === 'north' || door.wall === 'south');
+  const fixed = horiz ? c.z : c.x;
+  const half = LAYOUT.DOOR_W / 2;
+  const center = horiz ? c.x : c.z;
+  const lo = center - half, hi = center + half;
+
+  // 숨김 쪽 벽 스타일: displayDir 'a'(숨김=건너편)면 이웃 면 스타일, 'b'(숨김=이 방)면 이 방 면 스타일
+  let styleDef = wallFaceStyle(room, door.wall);
+  if (door.displayDir === 'a') {
+    const opp = findOppositeFace(project, room.id, door.wall, layout);
+    const space = opp ? (opp.roomId === '__lobby__' ? project.lobby : project.rooms.find(r => r.id === opp.roomId)) : null;
+    if (space) styleDef = wallFaceStyle(space, opp.wall);
+  }
+  const ws = wallStyleTexture(styleDef, patternImages[styleDef?.patternAsset]);
+
+  const yRotFor = (sign) => horiz ? (sign > 0 ? 0 : Math.PI) : (sign > 0 ? Math.PI / 2 : -Math.PI / 2);
+  const placeStrip = (mesh, off) => {
+    if (horiz) { mesh.position.set(center, mesh.position.y, fixed + hs.hiddenSign * off); }
+    else { mesh.position.set(fixed + hs.hiddenSign * off, mesh.position.y, center); }
+    mesh.rotation.y = yRotFor(hs.hiddenSign);
+    group.add(mesh);
+  };
+  // 벽 패널 (개구부 전체 높이 덮음). 숨김 쪽 벽면과 거의 flush + 상인방 앞에 두어 이음매 없이 벽처럼.
+  const panelMat = wallFaceMat(ws, LAYOUT.DOOR_W, wallH);
+  panelMat.side = THREE.FrontSide;
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(LAYOUT.DOOR_W, wallH), panelMat);
+  panel.position.y = wallH / 2;
+  placeStrip(panel, T / 2 + 0.006);
+  // 걸레받이 + 상단 몰딩 (숨김 쪽 이음매 연속 — buildWallBox 와 동일 색/치수)
+  const strip = (h, y, col, rough) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(LAYOUT.DOOR_W + 0.02, h),
+      new THREE.MeshStandardMaterial({ color: col, roughness: rough, side: THREE.FrontSide }));
+    m.position.y = y;
+    placeStrip(m, T / 2 + 0.012);
+  };
+  strip(0.14, 0.07, 0x2c2622, 0.7);          // 걸레받이
+  strip(0.10, wallH - 0.05, 0xe9e0d0, 0.9);  // 상단 몰딩
+
+  // 단방향 콜라이더 — 숨김 쪽 → 보이는 쪽 통행 차단 (controls.js 가 방향 판정)
+  oneWayColliders.push({ axis: hs.axis, fixed, lo, hi, hiddenSign: hs.hiddenSign });
 }
 
 // --- 구간 유틸 -------------------------------------------------------------
@@ -276,7 +335,7 @@ function buildWallBox(group, colliders, axis, fixed, s, e, height, wsPos, wsNeg,
 }
 
 // --- 문 위 상인방 (P3: 양면 재질 분리) ---------------------------------------
-function buildLintel(group, axis, fixed, o0, o1, doorH, wallH, wsPos, wsNeg) {
+function buildLintel(group, axis, fixed, o0, o1, doorH, wallH, wsPos, wsNeg, oneWay = false) {
   const len = o1 - o0;
   const h = wallH - doorH;
   if (h <= 0.01) return;
@@ -291,7 +350,8 @@ function buildLintel(group, axis, fixed, o0, o1, doorH, wallH, wsPos, wsNeg) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, h, sz), mat);
   mesh.position.set(px, doorH + h / 2, pz);
   group.add(mesh);
-  // 문틀 상단
+  // 문틀 상단 — 단방향 문은 숨김 쪽에 문틀이 비쳐 "티"가 나므로 생략(P1-2)
+  if (oneWay) return;
   const frame = new THREE.Mesh(new THREE.BoxGeometry(sx + 0.06, 0.08, sz + 0.06),
     new THREE.MeshStandardMaterial({ color: 0x3a2c20, roughness: 0.6 }));
   frame.position.set(px, doorH, pz);

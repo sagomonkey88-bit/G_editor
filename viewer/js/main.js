@@ -250,7 +250,7 @@ async function boot() {
     // (스폰 지점은 남쪽 벽 0.8m 앞이라 즉시 입장 시 카메라가 아바타에 밀착됨)
     const spawnZ = SKIP_INTRO ? Math.max(1.5, layout.spawn.z - 2.2) : layout.spawn.z;
     controls = new PlayerControls(avatar, camera, world.colliders, renderer.domElement, {
-      spawnX: layout.spawn.x, spawnZ,
+      spawnX: layout.spawn.x, spawnZ, oneWayColliders: world.oneWayColliders,
     });
     interactions = new Interactions(controls, arts.anchors, document.getElementById('hud'));
     hud?.attachControls(controls);
@@ -317,7 +317,7 @@ async function boot() {
     Object.assign(layout, layout2); // 참조 유지(컨트롤/오토워크가 같은 객체를 봄)
     world = buildWorld(scene, project2, layout, patternImages);
     arts = buildArtworks(scene, project2, layout, ctx, resolveAsset);
-    if (controls) controls.colliders = world.colliders;
+    if (controls) { controls.colliders = world.colliders; controls.oneWayColliders = world.oneWayColliders; }
     if (interactions) { interactions.anchors = arts.anchors; interactions.current = null; }
     if (autowalk) {
       autowalk.stop?.();
