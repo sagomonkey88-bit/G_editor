@@ -22,6 +22,7 @@ const DOOR_MARK = Object.freeze({
   dot: 5.5, dotSel: 7.5,  // 중심 마커 반경
   arrowGap: 5, arrowLen: 13, arrowW: 6, // 통행 방향 화살표(px, 줌 무관)
 });
+const DOOR_CORNER_PAD = 0.25; // 코너 최소거리 여유(m) — 문 폭 1/2 에 더함 (P1-1)
 const HANDLE_CURSOR = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
 
 export class PlanView {
@@ -264,10 +265,11 @@ export class PlanView {
     return null;
   }
 
-  // 문 (exitDoor): 활성 룸 = 드래그 핸들, 무효 문 = 빨강
+  // 문 (exitDoor): 활성 룸 = 드래그 핸들, 무효 문(인접 공간 없음/겹침) = 빨강
   _door(rect, room, on) {
     const door = room.exitDoor;
-    const valid = doorCovered(this.layout, room.id, door.wall, door.offset);
+    const valid = doorCovered(this.layout, room.id, door.wall, door.offset)
+      && !this._doorOverlapsOthers(rect, door.wall, door.offset, room.id);
     const c = this._doorMarker(rect, door.wall, door.offset, { on, valid });
     if (on) this._doorHandle = { x: c.cx, y: c.cy, rect, wall: door.wall, roomId: room.id };
   }
@@ -369,7 +371,9 @@ export class PlanView {
       }
       // 1) 문 핸들 (활성 룸)
       if (this._doorHandle && Math.hypot(sx - this._doorHandle.x, sy - this._doorHandle.y) < 12) {
-        this.drag = { type: 'door', ...this._doorHandle };
+        const rm = this.store.project.rooms.find(r => r.id === this._doorHandle.roomId);
+        const lastValid = rm?.exitDoor ? { wall: rm.exitDoor.wall, offset: rm.exitDoor.offset } : null;
+        this.drag = { type: 'door', ...this._doorHandle, lastValid };
         this.canvas.setPointerCapture(e.pointerId);
         return;
       }
@@ -451,6 +455,7 @@ export class PlanView {
         return;
       }
       if (['move', 'resize', 'door'].includes(d.type)) {
+        if (d.type === 'door') this._revertDoorIfInvalid(d);
         this.store.breakCoalesce();
         this.store.save();
       }
@@ -494,17 +499,85 @@ export class PlanView {
   }
 
   // ---- 드래그 동작 -----------------------------------------------------------
+  // P1-1: 문을 방 둘레(전방향) 최근접 벽으로 스냅 이동. 코너 넘으면 인접 벽 전환(문 방향 자동 회전).
+  // 유효성 = 인접 공간 맞닿음(doorCovered) + 다른 문 겹침 없음. 무효 = 빨강 표시(C1: 방 이동 없음).
+  // 무효 위치에서 드롭하면 pointerup 이 마지막 유효 위치로 복귀.
   _dragDoor(sx, sy) {
-    const [wx, wz] = this.s2w(sx, sy);
-    const { rect, wall, roomId } = this.drag;
-    let t = this._alongWall(rect, wall, wx, wz);
-    const len = wallLength(rect, wall);
-    t = Math.max(LAYOUT.DOOR_W / 2, Math.min(len - LAYOUT.DOOR_W / 2, t));
+    const { rect, roomId } = this.drag;
+    const snap = this._nearestPerimeter(rect, sx, sy);
+    const len = wallLength(rect, snap.wall);
+    const pad = LAYOUT.DOOR_W / 2 + DOOR_CORNER_PAD;
+    const t = +Math.max(pad, Math.min(len - pad, snap.t)).toFixed(2);
     this.store.mutate(p => {
       const rr = p.rooms.find(r => r.id === roomId);
-      if (rr && rr.exitDoor) rr.exitDoor.offset = +t.toFixed(2);
+      if (rr && rr.exitDoor) { rr.exitDoor.wall = snap.wall; rr.exitDoor.offset = t; }
     }, { detail: { silent: true }, coalesce: 'door:' + roomId });
+    const valid = doorCovered(this.layout, roomId, snap.wall, t)
+      && !this._doorOverlapsOthers(rect, snap.wall, t, roomId);
+    if (valid) this.drag.lastValid = { wall: snap.wall, offset: t };
     this.render();
+  }
+
+  // 마우스에서 방 둘레 최근접 벽 + 그 벽 offset(t). 코너 통과 시 최근접 벽이 바뀌며 벽 전환.
+  _nearestPerimeter(rect, sx, sy) {
+    const edges = {
+      north: this._distToSeg(sx, sy, rect.xMin, rect.zMin, rect.xMax, rect.zMin),
+      south: this._distToSeg(sx, sy, rect.xMin, rect.zMax, rect.xMax, rect.zMax),
+      west: this._distToSeg(sx, sy, rect.xMin, rect.zMin, rect.xMin, rect.zMax),
+      east: this._distToSeg(sx, sy, rect.xMax, rect.zMin, rect.xMax, rect.zMax),
+    };
+    const wall = Object.entries(edges).sort((a, b) => a[1] - b[1])[0][0];
+    const [wx, wz] = this.s2w(sx, sy);
+    return { wall, t: this._alongWall(rect, wall, wx, wz) };
+  }
+
+  // 문 개구부의 월드 구간 { horiz, lo, hi, fixed(경계선 좌표) } — 겹침 판정용.
+  _doorWorldInterval(rect, wall, offset) {
+    const len = wallLength(rect, wall);
+    const t = Math.max(0, Math.min(len, offset));
+    const half = LAYOUT.DOOR_W / 2;
+    const a = wallLeftToWorld(rect, wall, Math.max(0, t - half));
+    const b = wallLeftToWorld(rect, wall, Math.min(len, t + half));
+    const horiz = (wall === 'north' || wall === 'south');
+    return {
+      horiz,
+      lo: horiz ? Math.min(a.x, b.x) : Math.min(a.z, b.z),
+      hi: horiz ? Math.max(a.x, b.x) : Math.max(a.z, b.z),
+      fixed: horiz ? a.z : a.x,
+    };
+  }
+
+  // 후보 문이 다른 문/개구부(로비 입장 문 포함)와 같은 경계선에서 겹치는가.
+  _doorOverlapsOthers(rect, wall, offset, roomId) {
+    const me = this._doorWorldInterval(rect, wall, offset);
+    const EPS = 1e-3, GAP = 0.02;
+    const others = [];
+    const lb = this.layout.lobby;
+    if (lb) others.push(this._doorWorldInterval(lb, 'north', (lb.xMax - lb.xMin) / 2));
+    this.layout.rooms.forEach((lr, i) => {
+      const room = this.store.project.rooms[i];
+      if (!room || room.id === roomId || !room.exitDoor) return;
+      others.push(this._doorWorldInterval(lr.rect, room.exitDoor.wall, room.exitDoor.offset));
+    });
+    return others.some(o => o.horiz === me.horiz && Math.abs(o.fixed - me.fixed) < EPS
+      && me.lo < o.hi - GAP && me.hi > o.lo + GAP);
+  }
+
+  // 드롭 시 무효 문이면 마지막 유효 위치로 복귀 (C1: 방 이동 대신 배치 불가 처리)
+  _revertDoorIfInvalid(d) {
+    const room = this.store.project.rooms.find(r => r.id === d.roomId);
+    const rect = this._rectOf(d.roomId);
+    if (!room?.exitDoor || !rect) return;
+    const ok = doorCovered(this.layout, d.roomId, room.exitDoor.wall, room.exitDoor.offset)
+      && !this._doorOverlapsOthers(rect, room.exitDoor.wall, room.exitDoor.offset, d.roomId);
+    if (ok) return;
+    if (d.lastValid) {
+      this.store.mutate(p => {
+        const rr = p.rooms.find(r => r.id === d.roomId);
+        if (rr?.exitDoor) { rr.exitDoor.wall = d.lastValid.wall; rr.exitDoor.offset = d.lastValid.offset; }
+      }, { detail: { silent: true }, coalesce: 'door:' + d.roomId });
+    }
+    window.__toast?.('문을 놓을 수 없는 위치 — 마지막 유효 위치로 되돌렸습니다.', true);
   }
 
   _dragResize(sx, sy) {
