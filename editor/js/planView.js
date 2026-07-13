@@ -10,6 +10,18 @@ const HANDLE_PX = 5;       // 크기 핸들 반경(px)
 const SNAP_M = 0.45;       // 룸 이동 자석 스냅 거리(m)
 const DRAG_START_PX = 5;   // 클릭/드래그 판별 임계
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
+// P1-3: 문 마커 시인성 — 주황 전용색·확대·통행 방향 화살표·줌 무관 최소 크기.
+const DOOR_MARK = Object.freeze({
+  color: '#f2913d',       // 주황 전용색 (벽·작품 마커와 구분)
+  colorSel: '#ffb15e',    // 선택(활성 룸) 하이라이트
+  colorBad: '#e05656',    // 배치 불가
+  wallGlow: 'rgba(242,145,61,.32)', // 선택 시 소속 벽 구간 강조
+  minSpanPx: 20,          // 개구부 띠 최소 화면 길이(줌 아웃 보장)
+  spanW: 6,               // 개구부 띠 두께(px)
+  dot: 5.5, dotSel: 7.5,  // 중심 마커 반경
+  arrowGap: 5, arrowLen: 13, arrowW: 6, // 통행 방향 화살표(px, 줌 무관)
+});
 const HANDLE_CURSOR = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
 
 export class PlanView {
@@ -132,10 +144,8 @@ export class PlanView {
     const [lcx, lcy] = this.w2s((layout.lobby.xMin + layout.lobby.xMax) / 2, (layout.lobby.zMin + layout.lobby.zMax) / 2);
     g.fillStyle = '#6b7686'; g.font = '600 12px Pretendard'; g.textAlign = 'center';
     g.fillText('로비 · 타이틀월', lcx, lcy);
-    this._lobbyDoor(layout);
 
-    // 룸
-    this._doorHandle = null;
+    // 룸 (rect + 라벨 + 작품 마커). 문 마커는 별도 패스에서 모든 rect 위에 그린다.
     layout.rooms.forEach((lr, i) => {
       const room = this.store.project.rooms[i];
       const on = room.id === selId;
@@ -157,8 +167,14 @@ export class PlanView {
         g.beginPath(); g.arc(mx, my, out ? 5 : 4, 0, 7); g.fill();
         if (out) { g.strokeStyle = '#e05656'; g.lineWidth = 1.5; g.beginPath(); g.arc(mx, my, 8, 0, 7); g.stroke(); }
       }
-      // exitDoor
-      if (room.exitDoor) this._door(lr.rect, room, on);
+    });
+
+    // 문 마커 패스 — 모든 rect 위에 그려 통행 화살표가 인접 룸 채움에 덮이지 않게 (P1-3)
+    this._doorHandle = null;
+    this._lobbyDoor(layout);
+    layout.rooms.forEach((lr, i) => {
+      const room = this.store.project.rooms[i];
+      if (room.exitDoor) this._door(lr.rect, room, room.id === selId);
     });
 
     // 활성 룸: 벽 호버 하이라이트 + 크기 핸들
@@ -250,35 +266,68 @@ export class PlanView {
 
   // 문 (exitDoor): 활성 룸 = 드래그 핸들, 무효 문 = 빨강
   _door(rect, room, on) {
-    const g = this.ctx;
     const door = room.exitDoor;
     const valid = doorCovered(this.layout, room.id, door.wall, door.offset);
-    const len = wallLength(rect, door.wall);
-    const t = Math.max(0, Math.min(len, door.offset));
-    const half = LAYOUT.DOOR_W / 2;
-    const a = wallLeftToWorld(rect, door.wall, Math.max(0, t - half));
-    const b = wallLeftToWorld(rect, door.wall, Math.min(len, t + half));
-    const c = wallLeftToWorld(rect, door.wall, t);
-    const [ax, ay] = this.w2s(a.x, a.z), [bx, by] = this.w2s(b.x, b.z);
-    g.strokeStyle = valid ? (on ? '#e6c878' : '#8a94a2') : '#e05656';
-    g.lineWidth = 4;
-    g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
-    const [cx, cy] = this.w2s(c.x, c.z);
-    g.fillStyle = valid ? '#e6c878' : '#e05656';
-    g.beginPath(); g.arc(cx, cy, on ? 6 : 4, 0, 7); g.fill();
-    if (on) this._doorHandle = { x: cx, y: cy, rect, wall: door.wall, roomId: room.id };
+    const c = this._doorMarker(rect, door.wall, door.offset, { on, valid });
+    if (on) this._doorHandle = { x: c.cx, y: c.cy, rect, wall: door.wall, roomId: room.id };
   }
 
   // 로비 입장 문 (북쪽 중앙 고정 · 드래그 불가)
   _lobbyDoor(layout) {
-    const g = this.ctx;
     const lb = layout.lobby;
-    const cx = (lb.xMin + lb.xMax) / 2;
     const valid = doorCovered(layout, '__lobby__', 'north', (lb.xMax - lb.xMin) / 2);
-    const [ax, ay] = this.w2s(cx - LAYOUT.DOOR_W / 2, lb.zMin);
-    const [bx] = this.w2s(cx + LAYOUT.DOOR_W / 2, lb.zMin);
-    g.strokeStyle = valid ? '#8a94a2' : '#e05656'; g.lineWidth = 4;
-    g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, ay); g.stroke();
+    this._doorMarker(lb, 'north', (lb.xMax - lb.xMin) / 2, { on: false, valid });
+  }
+
+  // P1-3: 문 마커 렌더 — 개구부 띠 + 통행 방향 화살표 + 중심 마커. 반환 { cx, cy }(핸들 좌표).
+  // 줌 무관 최소 크기 보장. displayDir(P1-2) 는 이후 항목에서 반쪽/한쪽 화살표로 확장.
+  _doorMarker(rect, wall, offset, { on = false, valid = true } = {}) {
+    const g = this.ctx;
+    const len = wallLength(rect, wall);
+    const t = Math.max(0, Math.min(len, offset));
+    const half = LAYOUT.DOOR_W / 2;
+    const a = wallLeftToWorld(rect, wall, Math.max(0, t - half));
+    const b = wallLeftToWorld(rect, wall, Math.min(len, t + half));
+    const c = wallLeftToWorld(rect, wall, t);
+    const [cx, cy] = this.w2s(c.x, c.z);
+    let [ax, ay] = this.w2s(a.x, a.z), [bx, by] = this.w2s(b.x, b.z);
+    // 줌 무관: 화면 스팬이 최소치보다 짧으면 중심 기준으로 늘려 그린다
+    let dx = bx - ax, dy = by - ay, sl = Math.hypot(dx, dy) || 1;
+    if (sl < DOOR_MARK.minSpanPx) {
+      const hh = DOOR_MARK.minSpanPx / 2, ux0 = dx / sl, uy0 = dy / sl;
+      ax = cx - ux0 * hh; ay = cy - uy0 * hh; bx = cx + ux0 * hh; by = cy + uy0 * hh;
+      dx = bx - ax; dy = by - ay; sl = DOOR_MARK.minSpanPx;
+    }
+    const col = !valid ? DOOR_MARK.colorBad : (on ? DOOR_MARK.colorSel : DOOR_MARK.color);
+    // 선택(활성 룸) 시 소속 벽 구간 강조
+    if (on && valid) {
+      const wa = wallLeftToWorld(rect, wall, 0), wb = wallLeftToWorld(rect, wall, len);
+      const [wax, way] = this.w2s(wa.x, wa.z), [wbx, wby] = this.w2s(wb.x, wb.z);
+      g.strokeStyle = DOOR_MARK.wallGlow; g.lineWidth = 3; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(wax, way); g.lineTo(wbx, wby); g.stroke();
+    }
+    // 개구부 띠
+    g.strokeStyle = col; g.lineWidth = DOOR_MARK.spanW; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
+    g.lineCap = 'butt';
+    // 통행 방향 화살표 (벽 수직 양쪽 — 양방향 문)
+    const ux = dx / sl, uy = dy / sl, nx = -uy, ny = ux;
+    g.fillStyle = col; g.strokeStyle = col; g.lineWidth = 2.5;
+    for (const s of [1, -1]) {
+      const x0 = cx + nx * s * DOOR_MARK.arrowGap, y0 = cy + ny * s * DOOR_MARK.arrowGap;
+      const x1 = cx + nx * s * (DOOR_MARK.arrowGap + DOOR_MARK.arrowLen), y1 = cy + ny * s * (DOOR_MARK.arrowGap + DOOR_MARK.arrowLen);
+      g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+      const w2 = DOOR_MARK.arrowW;
+      g.beginPath();
+      g.moveTo(x1, y1);
+      g.lineTo(x1 - nx * s * w2 + ux * w2, y1 - ny * s * w2 + uy * w2);
+      g.lineTo(x1 - nx * s * w2 - ux * w2, y1 - ny * s * w2 - uy * w2);
+      g.closePath(); g.fill();
+    }
+    // 중심 마커
+    g.fillStyle = col; g.strokeStyle = '#14171c'; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(cx, cy, on ? DOOR_MARK.dotSel : DOOR_MARK.dot, 0, 7); g.fill(); g.stroke();
+    return { cx, cy };
   }
 
   // ---- 입력 ------------------------------------------------------------------
