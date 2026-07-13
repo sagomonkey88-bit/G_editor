@@ -4,7 +4,7 @@ import { LibraryPanel } from './libraryPanel.js';
 import { Inspector } from './inspector.js';
 import { PlanView } from './planView.js';
 import { ElevationView } from './elevationView.js';
-import { PRESETS, RANGES, LOBBY_RANGES, makeRoom, makeText, computeLayout, wallLength, LAYOUT, findOppositeFace } from '../../shared/schema.js';
+import { PRESETS, RANGES, LOBBY_RANGES, makeRoom, makeText, computeLayout, wallLength, wallLeftToWorld, LAYOUT, findOppositeFace, doorCovered } from '../../shared/schema.js';
 import { openPreview } from './previewBridge.js';
 import { LivePreview } from './livePreview.js';
 import { exportPublishZip } from './exporter.js';
@@ -271,6 +271,11 @@ function renderRoomProps() {
   const scaleSetting = store.project.autoLayout?.scaleSetting ?? 3.5;
   const hasAutoOverride = !isLobby && typeof room.autoScale === 'number';
   const effScale = isLobby ? scaleSetting : effectiveScale(store.project, room);
+  // P1-4: 출구 문은 모든 방(로비 제외)에서 설치 가능 — 마지막 방 제한 해제.
+  const doorLayout = isLobby ? null : computeLayout(store.project);
+  const doorConnected = !isLobby && room.exitDoor
+    && doorCovered(doorLayout, room.id, room.exitDoor.wall, room.exitDoor.offset);
+  const doorOpp = doorConnected ? findOppositeFace(store.project, room.id, room.exitDoor.wall, doorLayout) : null;
   root.innerHTML = `
     <div class="panel-title">${isLobby ? '로비 속성 (그랜드 로비)' : '룸 속성'}</div>
     ${isLobby ? '<div class="hint-note" style="margin-bottom:10px">전시 타이틀월과 입장 문이 있는 대공간입니다. 삭제·순서 변경 불가.</div>' : `
@@ -295,10 +300,18 @@ function renderRoomProps() {
     ${isLobby ? `
     <div class="panel-title" style="margin-top:14px">관람 설정</div>
     <div class="toggle-row"><label>방 이동 메뉴 허용 (M키·모바일 버튼)</label><div class="switch ${store.project.meta.allowTeleport !== false ? 'on' : ''}" data-allow-tp></div></div>` : ''}
-    ${isLobby || isLast ? (isLobby ? '' : '<div class="hint-note">마지막 룸 — 출구 문 없음</div>') : `
-    <div class="field"><label>출구 문 벽</label>
-      <div class="seg" data-exit-wall>${PRESETS.wallDir.map(w => `<button data-v="${w}" class="${room.exitDoor?.wall === w ? 'on' : ''}">${w}</button>`).join('')}</div></div>
-    <div class="field"><label>문 위치 offset (m)</label><input type="number" step="0.1" data-exit-offset value="${room.exitDoor?.offset ?? 3}"></div>`}
+    ${isLobby ? '' : `
+    <div class="panel-title" style="margin-top:14px">출구 문</div>
+    <div class="toggle-row"><label>출구 문 설치</label><div class="switch ${room.exitDoor ? 'on' : ''}" data-door-toggle></div></div>
+    ${room.exitDoor ? `
+    <div class="field"><label>문 벽</label>
+      <div class="seg" data-exit-wall>${PRESETS.wallDir.map(w => `<button data-v="${w}" class="${room.exitDoor.wall === w ? 'on' : ''}">${DIR_KO[w]}</button>`).join('')}</div></div>
+    <div class="field"><label>문 위치 offset (m)</label><input type="number" step="0.1" data-exit-offset value="${room.exitDoor.offset ?? 3}"></div>
+    ${doorConnected
+      ? `<div class="hint-note">→ ${attr(doorOpp?.name || '인접 공간')}과(와) 연결됨</div>`
+      : `<div class="hint-note" style="color:var(--danger)">이 벽에 인접한 공간이 없어 개구부가 생기지 않습니다.</div>
+         <button class="tb-btn" data-connect-room style="width:100%;margin-top:4px">연결할 방 선택…</button>`}`
+    : '<div class="hint-note">이 방에는 출구 문이 없습니다. 위 토글로 만들 수 있습니다.</div>'}`}
   `;
   const upd = (fn, opts = {}) => store.mutate(p => { const r = roomRef(p, room.id); if (r) fn(r); }, { detail: { silent: opts.silent !== false }, coalesce: opts.coalesce });
   root.querySelector('[data-rp=name]')?.addEventListener('input', e => upd(r => { r.name = e.target.value; }, { coalesce: `room.name:${room.id}` }));
@@ -364,6 +377,22 @@ function renderRoomProps() {
     store.mutate(p => { p.meta.allowTeleport = p.meta.allowTeleport === false; }, { detail: {} });
     renderRoomProps();
   });
+  // P1-4: 출구 문 설치/제거 토글 — 인접 공간 있는 벽 자동 선택, 없으면 north 기본(→ 연결 UI)
+  root.querySelector('[data-door-toggle]')?.addEventListener('click', () => {
+    const layout = computeLayout(store.project);
+    const lrect = layout.rooms[idx]?.rect;
+    upd(r => {
+      if (r.exitDoor) { r.exitDoor = null; return; }
+      let created = null;
+      if (lrect) {
+        const others = [layout.lobby, ...layout.rooms.filter(lr => lr.id !== r.id).map(lr => lr.rect)];
+        for (const B of others) { const sd = sharedDoor(lrect, B); if (sd) { created = sd; break; } }
+      }
+      r.exitDoor = created || { wall: 'north', offset: +(r.size.w / 2).toFixed(2) };
+    }, { silent: false });
+    renderRoomProps();
+  });
+  root.querySelector('[data-connect-room]')?.addEventListener('click', () => connectRoomPicker(room));
   const ew = root.querySelector('[data-exit-wall]');
   if (ew) ew.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; upd(r => { r.exitDoor = r.exitDoor || { offset: 3 }; r.exitDoor.wall = b.dataset.v; }, { silent: false }); renderRoomProps(); });
   const eo = root.querySelector('[data-exit-offset]');
@@ -655,6 +684,64 @@ function findFreeSpot(layout, baseRect, size) {
     if (!overlaps(o)) return o;
   }
   return { x: +(layout.bounds.xMax + 2).toFixed(2), z: +(-size.d).toFixed(2) };
+}
+
+// P1-4: 연결할 방 선택 — 인접 공간 없는 문에 방을 이동해 연결. C1: 자동 이동 금지.
+// 반드시 확인 다이얼로그를 거치고, 대상 방이 이미 연결됐거나 자리가 없으면 이동 차단.
+function connectRoomPicker(room) {
+  const door = room.exitDoor;
+  if (!door) return;
+  const others = store.project.rooms.filter(r => r.id !== room.id);
+  if (!others.length) { toast('연결할 다른 방이 없습니다.', true); return; }
+  const pop = document.createElement('div');
+  pop.className = 'ed-modal';
+  pop.innerHTML = `
+    <div class="ed-card">
+      <div class="ed-title">연결할 방 선택</div>
+      <div class="ed-body">"${attr(room.name)}"의 ${DIR_KO[door.wall]} 벽 문 앞으로 선택한 방을 이동해 연결합니다. 이미 다른 문으로 연결됐거나 이동할 자리가 없는 방은 이동할 수 없습니다.</div>
+      <div style="max-height:220px;overflow:auto;margin-bottom:8px">${others.map(r => `<button class="tb-btn" data-rid="${r.id}" style="width:100%;margin-bottom:6px">${attr(r.name)}</button>`).join('')}</div>
+      <div class="ed-actions"><button class="tb-btn" data-m="cancel">취소</button></div>
+    </div>`;
+  document.body.appendChild(pop);
+  pop.querySelector('[data-m=cancel]').addEventListener('click', () => pop.remove());
+  pop.querySelectorAll('[data-rid]').forEach(btn => btn.addEventListener('click', () => {
+    const B = store.project.rooms.find(r => r.id === btn.dataset.rid);
+    pop.remove();
+    if (B) tryConnectRoom(room, B);
+  }));
+}
+
+function tryConnectRoom(A, B) {
+  const layout = computeLayout(store.project);
+  const i = layout.rooms.findIndex(r => r.id === A.id);
+  const Arect = layout.rooms[i]?.rect;
+  const door = A.exitDoor;
+  if (!Arect || !door) return;
+  // C1: B 가 이미 유효한 출구 문으로 연결돼 있으면 이동 금지
+  if (B.exitDoor && doorCovered(layout, B.id, B.exitDoor.wall, B.exitDoor.offset)) {
+    toast(`"${B.name}" 방은 이미 다른 문으로 연결되어 있어 이동할 수 없습니다.`, true); return;
+  }
+  const origin = flushOriginFor(Arect, door, B.size);
+  const newRect = { xMin: origin.x, xMax: origin.x + B.size.w, zMin: origin.z, zMax: origin.z + B.size.d };
+  const obstacles = [layout.lobby, ...layout.rooms.filter(r => r.id !== A.id && r.id !== B.id).map(r => r.rect)];
+  const overlaps = obstacles.some(R => R
+    && Math.min(newRect.xMax, R.xMax) - Math.max(newRect.xMin, R.xMin) > 1e-6
+    && Math.min(newRect.zMax, R.zMax) - Math.max(newRect.zMin, R.zMin) > 1e-6);
+  if (overlaps) { toast(`"${B.name}" 방을 이동할 자리가 없습니다. 방을 직접 옮긴 뒤 다시 시도하세요.`, true); return; }
+  confirmDialog('방 이동', `"${B.name}" 방을 "${A.name}"의 문 앞으로 이동합니다. 진행할까요?`, () => {
+    store.mutate(p => { const b = p.rooms.find(r => r.id === B.id); if (b) b.origin = { x: origin.x, z: origin.z }; }, { detail: {} });
+    toast(`"${B.name}" 방을 이동해 문을 연결했습니다.`);
+    renderRoomProps();
+  });
+}
+
+// 방 B 를 A 의 문 벽에 딱 붙여 문 중앙에 정렬하는 origin(rect 북서 꼭짓점).
+function flushOriginFor(Arect, door, Bsize) {
+  const c = wallLeftToWorld(Arect, door.wall, door.offset);
+  if (door.wall === 'north') return { x: +(c.x - Bsize.w / 2).toFixed(2), z: +(Arect.zMin - Bsize.d).toFixed(2) };
+  if (door.wall === 'south') return { x: +(c.x - Bsize.w / 2).toFixed(2), z: +Arect.zMax.toFixed(2) };
+  if (door.wall === 'east') return { x: +Arect.xMax.toFixed(2), z: +(c.z - Bsize.d / 2).toFixed(2) };
+  return { x: +(Arect.xMin - Bsize.w).toFixed(2), z: +(c.z - Bsize.d / 2).toFixed(2) }; // west
 }
 
 // 두 rect 가 맞닿은 변 → 기준 룸(A)의 문 {wall, offset = 공유 스팬 중앙} (wallLeftToWorld 규약)

@@ -110,13 +110,13 @@
 - [x] 검증: 4벽 드래그 → wall 전환(north 유효/east·west 무효 red/south offset2 유효·offset6 로비문 겹침 red), 드롭 시 south/2 로 복귀, 콘솔 클린. 단방향 드래그는 P1-2 후 재확인
 - [x] 커밋 `feat(v1.6): P1-1 …`
 
-## P1-4. 마지막 방 문 생성 제한 해제
-- [ ] app.js: 룸 속성 `isLast` 게이팅 제거 — 어느 방·어느 벽이든 문 설정 가능
-- [ ] 반대편 인접 방 있으면 연결, 없으면 "연결할 방 선택" UI
-- [ ] **C1 준수**: 선택 방을 자동 이동하지 않음 — 확인 다이얼로그 + 이미 연결됨/공간 없음이면 차단·배치 불가
-- [ ] 방 생성 순서와 문 가능 여부 종속 제거
-- [ ] 검증: 마지막 방에 문 생성, 연결 UI, C1 다이얼로그·차단 동작
-- [ ] 커밋 `feat(v1.6): P1-4 …`
+## P1-4. 마지막 방 문 생성 제한 해제 ✅ (커밋 완료)
+- [x] app.js: `isLast` 게이팅 제거 — 모든 방(로비 제외)에 "출구 문 설치" 토글 + 벽/offset 컨트롤
+- [x] 문 생성 시 인접 공간 있는 벽 자동 선택(sharedDoor), 연결 상태 "→ OO과 연결됨" 표시. 방 순서와 종속 분리
+- [x] 인접 없으면 "연결할 방 선택" UI(connectRoomPicker/tryConnectRoom/flushOriginFor)
+- [x] **C1 준수**: 자동 이동 금지 — confirmDialog 필수. 대상 방이 유효 문으로 이미 연결됨 OR 이동 자리 겹침이면 이동 차단(toast). 확인 시에만 origin 이동
+- [x] 검증: 마지막 방 토글로 문 생성+자동 연결(south→room0), 연결됨 표시. connect picker: 연결된 방 차단(toast·미이동), 미연결 방 confirm→이동(overlap 0). 콘솔 클린
+- [x] 커밋 `feat(v1.6): P1-4 …`
 
 ## P1-2. 단방향 문
 - [ ] schema.js: `exitDoor.displayDir: 'both'|'a'|'b'` (기본 both, 구 프로젝트 외관 불변)
