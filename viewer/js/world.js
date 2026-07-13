@@ -199,7 +199,7 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
   }
 
   // ---- 그랜드 로비 데코 (P3 — 전부 절차 생성, 토글) ----
-  buildLobbyDecor(group, colliders, rects[0], project);
+  buildLobbyDecor(group, colliders, rects[0], project, openings);
 
   // ---- 텍스트 오브젝트 (v1.3 P4 — 타이틀월/섹션 패널 포함 자유 배치) ----
   buildTexts(group, project, layout);
@@ -320,7 +320,7 @@ function addBench(group, colliders, cx, cz) {
 // ============================================================================
 const GOLD = 0xC9A24C;
 
-function buildLobbyDecor(group, colliders, lobbyRect, project) {
+function buildLobbyDecor(group, colliders, lobbyRect, project, openings = new Map()) {
   const def = lobbyRect.lobbyDef || {};
   const decor = def.decor || {};
   const { rect } = lobbyRect;
@@ -336,7 +336,7 @@ function buildLobbyDecor(group, colliders, lobbyRect, project) {
   }
   if (decor.columns !== false) addColumns(group, colliders, rect, h);
   if (decor.cofferedCeiling !== false) addCofferedCeiling(group, rect, h);
-  if (decor.goldTrim !== false) addGoldTrim(group, rect, h);
+  if (decor.goldTrim !== false) addGoldTrim(group, rect, h, openings);
   if (decor.carpet !== false) addCarpet(group, rect);
 }
 
@@ -454,7 +454,9 @@ function addCofferedCeiling(group, rect, h) {
 }
 
 // 골드 몰딩: 벽 상단 코니스 + 걸레받이 골드 트림.
-function addGoldTrim(group, rect, h) {
+// openings(P1-5): 걸레받이(바닥 근처 낮은 띠)는 문 개구부 위로 떠 보이므로 개구부 구간을 잘라낸다.
+// 코니스(상단)는 문 위 상인방 벽에 붙어 있어 뜨지 않으므로 연속 유지(자르면 문 위 금선에 틈이 생김).
+function addGoldTrim(group, rect, h, openings = new Map()) {
   const mat = new THREE.MeshStandardMaterial({ color: GOLD, metalness: 0.7, roughness: 0.35 });
   const w = rect.xMax - rect.xMin, d = rect.zMax - rect.zMin;
   const cx = (rect.xMin + rect.xMax) / 2, cz = (rect.zMin + rect.zMax) / 2;
@@ -464,12 +466,17 @@ function addGoldTrim(group, rect, h) {
     group.add(m);
   };
   const t = T + 0.06;
-  // 코니스 (상단)
+  const opsX = (z) => (openings.get(hkey(z)) || []).map(o => [o.center - o.width / 2, o.center + o.width / 2]);
+  const opsZ = (x) => (openings.get(vkey(x)) || []).map(o => [o.center - o.width / 2, o.center + o.width / 2]);
+  // 개구부를 뺀 걸레받이 세그먼트 (낮은 띠 — 문 위로 뜨지 않게)
+  const trimH = (z, y, th) => { for (const [a, b] of subtractIntervals([rect.xMin, rect.xMax], opsX(z))) mk(b - a, t, (a + b) / 2, z, y, th); };
+  const trimV = (x, y, th) => { for (const [a, b] of subtractIntervals([rect.zMin, rect.zMax], opsZ(x))) mk(t, b - a, x, (a + b) / 2, y, th); };
+  // 코니스 (상단) — 연속
   mk(w, t, cx, rect.zMin, h - 0.18, 0.16); mk(w, t, cx, rect.zMax, h - 0.18, 0.16);
   mk(t, d, rect.xMin, cz, h - 0.18, 0.16); mk(t, d, rect.xMax, cz, h - 0.18, 0.16);
-  // 골드 걸레받이 트림
-  mk(w, t, cx, rect.zMin, 0.19, 0.05); mk(w, t, cx, rect.zMax, 0.19, 0.05);
-  mk(t, d, rect.xMin, cz, 0.19, 0.05); mk(t, d, rect.xMax, cz, 0.19, 0.05);
+  // 골드 걸레받이 트림 — 개구부에서 절단
+  trimH(rect.zMin, 0.19, 0.05); trimH(rect.zMax, 0.19, 0.05);
+  trimV(rect.xMin, 0.19, 0.05); trimV(rect.xMax, 0.19, 0.05);
 }
 
 // 레드 카펫: 남쪽 입구 → 북쪽 전시 입장 문 러너 + 골드 보더.
