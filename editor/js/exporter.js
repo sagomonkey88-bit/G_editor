@@ -62,8 +62,8 @@ export async function exportPublishZip(store, opts = {}) {
     base.file(`data/${path}`, im.blob);
   };
   const packFaces = (r) => { for (const f of Object.values(r?.wallFaces || {})) packPattern(f, 'patternAsset'); }; // P3
-  for (const r of proj.rooms) { packPattern(r.wall, 'patternAsset'); packPattern(r.floor, 'asset'); packFaces(r); }
-  if (proj.lobby) { packPattern(proj.lobby.wall, 'patternAsset'); packPattern(proj.lobby.floor, 'asset'); packFaces(proj.lobby); }
+  for (const r of proj.rooms) { packPattern(r.wall, 'patternAsset'); packPattern(r.floor, 'asset'); packPattern(r.ceiling, 'muralImage'); packFaces(r); }
+  if (proj.lobby) { packPattern(proj.lobby.wall, 'patternAsset'); packPattern(proj.lobby.floor, 'asset'); packPattern(proj.lobby.ceiling, 'muralImage'); packFaces(proj.lobby); }
 
   base.file('data/museum.json', JSON.stringify(proj, null, 2));
 

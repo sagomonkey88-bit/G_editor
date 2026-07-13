@@ -116,6 +116,7 @@ async function preloadPatterns(project, ctx) {
   const scan = (r) => {
     if (r?.wall?.pattern === 'custom' && r.wall.patternAsset) keys.add(r.wall.patternAsset);
     if (r?.floor?.preset === 'custom' && r.floor.asset) keys.add(r.floor.asset);
+    if (r?.ceiling?.muralImage) keys.add(r.ceiling.muralImage); // P2: 천장화
     // P3: 면 단위 오버라이드의 커스텀 패턴
     for (const f of Object.values(r?.wallFaces || {})) {
       if (f?.pattern === 'custom' && f.patternAsset) keys.add(f.patternAsset);

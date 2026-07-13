@@ -15,6 +15,10 @@ const $ = (s) => document.querySelector(s);
 
 const WALL_SWATCH = { 'deep-red': '#5e2626', green: '#2c4436', navy: '#26324e', gray: '#5f5a53' };
 const FLOOR_SWATCH = { 'walnut-herringbone': '#6b4a30', 'oak-herringbone': '#9c7748', 'ash-plank': '#c3ac86', 'walnut-plank': '#5c3f2b' };
+// P2(v1.6): 천장 — 색 프리셋 + 조명 소품 프리셋 (바닥 색 UI 패턴 재사용)
+const CEIL_SWATCH = { cream: '#ece4d6', white: '#f5f2ea', warmgray: '#cfc7b8', slate: '#9aa0a6', charcoal: '#3a3a3e' };
+const CEIL_LABELS = { cream: '크림', white: '화이트', warmgray: '웜그레이', slate: '슬레이트', charcoal: '차콜' };
+const FIXTURES = [{ v: 'none', label: '없음' }, { v: 'chandelier', label: '샹들리에' }, { v: 'pendant', label: '펜던트' }, { v: 'recessed', label: '매입등' }, { v: 'dome', label: '돔' }];
 const LABELS = { 'deep-red': '딥레드', green: '딥그린', navy: '네이비', gray: '웜그레이', 'walnut-herringbone': '월넛헤링본', 'oak-herringbone': '오크헤링본', 'ash-plank': '애쉬플랭크', 'walnut-plank': '월넛플랭크', warm: 'Warm', neutral: 'Neutral', cool: 'Cool' };
 
 let store, plan, elev, mode = 'plan';
@@ -443,6 +447,7 @@ function renderAtmosphere() {
   const hasOverride = faceMode && !!(room.wallFaces && room.wallFaces[wallDir]);
   const W = faceMode ? ((room.wallFaces || {})[wallDir] || room.wall) : room.wall;
   const F = room.floor;
+  const C = room.ceiling || {}; // P2: 천장
   const PATTERN_LABELS = { damask: '다마스크', stripes: '줄무늬', plaster: '플라스터', fabric: '패브릭', dots: '도트', plain: '민무늬', custom: '커스텀' };
   const patternOpts = ['damask', 'stripes', 'plaster', 'fabric', 'dots', 'plain', ...(W.patternAsset ? ['custom'] : [])];
   root.innerHTML = `
@@ -491,6 +496,25 @@ function renderAtmosphere() {
       `}
       <div class="toggle-row" style="margin-top:8px"><label>유광 (은은한 반사)</label><div class="switch ${F.roughness === 'gloss' ? 'on' : ''}" data-floor-gloss></div></div>
       <button class="tb-btn" data-floor-all style="width:100%;margin-top:8px;font-size:12px">이 바닥을 모든 공간에 일괄 적용</button>
+    </div>
+    <div class="swatch-group"><h4>천장</h4>
+      <div class="field-row" style="align-items:center;gap:6px">
+        <input type="color" data-ceil-color value="${C.color || '#ece4d6'}" style="width:40px;height:30px;border:none;border-radius:6px;background:none;cursor:pointer">
+        <input type="text" data-ceil-hex value="${C.color || '#ece4d6'}" style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:6px 8px;font-size:12px">
+      </div>
+      <div class="swatches" style="margin-top:8px">${Object.entries(CEIL_SWATCH).map(([k, c]) =>
+        `<div class="swatch ${C.color === c ? 'on' : ''}" data-ceil-quick="${c}" style="background:${c}"><span>${CEIL_LABELS[k]}</span></div>`).join('')}</div>
+      <div class="field" style="margin-top:8px"><label>밝기 ${Math.round((C.lightIntensity ?? 1) * 100)}% (방 조명)</label>
+        <input type="range" data-ceil-light min="0" max="2" step="0.05" value="${C.lightIntensity ?? 1}"></div>
+      <div class="field"><label>조명 소품</label>
+        <select data-ceil-fixture style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:7px">
+          ${FIXTURES.map(f => `<option value="${f.v}" ${(C.fixture || 'none') === f.v ? 'selected' : ''}>${f.label}</option>`).join('')}
+        </select></div>
+      <label class="lib-browse" style="display:block;text-align:center;margin-top:6px;font-size:12px">천장화 업로드 (최대 2048px)<input type="file" accept="image/*" data-ceil-mural hidden></label>
+      ${C.muralImage ? `<div class="field" style="margin-top:6px"><label>천장화 표시</label>
+        <div class="seg" data-ceil-muralmode><button data-v="full" class="${C.muralMode !== 'center' ? 'on' : ''}">전체</button><button data-v="center" class="${C.muralMode === 'center' ? 'on' : ''}">중앙 패널</button></div></div>
+      <button class="tb-btn" data-ceil-mural-clear style="width:100%;margin-top:6px;font-size:12px">천장화 제거</button>` : ''}
+      <button class="tb-btn" data-ceil-all style="width:100%;margin-top:8px;font-size:12px">이 천장을 모든 공간에 일괄 적용</button>
     </div>
     <div class="swatch-group"><h4>조명 무드</h4>
       <div class="seg" data-mood>${PRESETS.lightingMood.map(m => `<button data-v="${m}" class="${room.lighting.mood === m ? 'on' : ''}">${LABELS[m]}</button>`).join('')}</div></div>
@@ -548,6 +572,28 @@ function renderAtmosphere() {
   root.querySelector('[data-floor-upload]').addEventListener('change', (e) => uploadPattern(e.target.files[0], room.id, 'floor'));
   root.querySelector('[data-mood]').addEventListener('click', e => { const b = e.target.closest('button'); if (b) upd(r => { r.lighting.mood = b.dataset.v; }); });
   root.querySelectorAll('[data-decor]').forEach(el => el.addEventListener('click', () => upd(r => { r.decor[el.dataset.decor] = !r.decor[el.dataset.decor]; })));
+
+  // P2(v1.6): 천장 — 색·밝기·조명 소품·천장화·일괄 (바닥 UI 패턴 재사용)
+  const ceilOf = (r) => (r.ceiling = r.ceiling || {});
+  root.querySelector('[data-ceil-color]')?.addEventListener('input', e => { updQuiet(r => { ceilOf(r).color = e.target.value; }, 'ceilcolor:' + room.id); root.querySelector('[data-ceil-hex]').value = e.target.value; });
+  root.querySelector('[data-ceil-hex]')?.addEventListener('change', e => { const v = e.target.value.trim(); if (/^#[0-9a-fA-F]{6}$/.test(v)) upd(r => { ceilOf(r).color = v; }); });
+  root.querySelectorAll('[data-ceil-quick]').forEach(el => el.addEventListener('click', () => upd(r => { ceilOf(r).color = el.dataset.ceilQuick; })));
+  root.querySelector('[data-ceil-light]')?.addEventListener('input', e => updQuiet(r => { ceilOf(r).lightIntensity = parseFloat(e.target.value); }, 'ceillight:' + room.id));
+  root.querySelector('[data-ceil-light]')?.addEventListener('change', () => renderAtmosphere());
+  root.querySelector('[data-ceil-fixture]')?.addEventListener('change', e => upd(r => { ceilOf(r).fixture = e.target.value; }));
+  root.querySelector('[data-ceil-mural]')?.addEventListener('change', e => uploadPattern(e.target.files[0], room.id, 'ceiling'));
+  root.querySelector('[data-ceil-muralmode]')?.addEventListener('click', e => { const b = e.target.closest('button'); if (b) upd(r => { ceilOf(r).muralMode = b.dataset.v; }); });
+  root.querySelector('[data-ceil-mural-clear]')?.addEventListener('click', () => upd(r => { if (r.ceiling) r.ceiling.muralImage = null; }));
+  root.querySelector('[data-ceil-all]')?.addEventListener('click', () => {
+    store.mutate(p => {
+      const src = roomRef(p, room.id); if (!src) return;
+      const def = JSON.stringify(src.ceiling || {});
+      for (const r of p.rooms) r.ceiling = JSON.parse(def);
+      if (p.lobby) p.lobby.ceiling = JSON.parse(def);
+    }, { detail: {} });
+    toast('모든 공간 천장에 일괄 적용했습니다.');
+    renderAtmosphere();
+  });
 }
 
 // 커스텀 패턴 업로드 (P5): 1024px WebP 최적화 → IndexedDB → wall/floor 필드 연결
@@ -556,7 +602,8 @@ async function uploadPattern(file, roomId, kind, faceDir = null) {
   if (!file) return;
   try {
     const { processImageFile } = await import('./libraryPanel.js');
-    const res = await processImageFile(file, 1024);
+    // P2: 천장화는 최대 2048px (벽/바닥 패턴은 1024px)
+    const res = await processImageFile(file, kind === 'ceiling' ? 2048 : 1024);
     const id = 'pat-' + Math.random().toString(36).slice(2, 8);
     await store.addImage(id, res.blob, res.thumbBlob);
     store.mutate(p => {
@@ -571,10 +618,12 @@ async function uploadPattern(file, roomId, kind, faceDir = null) {
         } else delete r.wallFaces;
         t.pattern = 'custom'; t.patternAsset = id; t.patternScale = t.patternScale || 1;
       }
+      else if (kind === 'ceiling') { r.ceiling = r.ceiling || {}; r.ceiling.muralImage = id; r.ceiling.muralMode = r.ceiling.muralMode || 'full'; }
       else { r.floor.preset = 'custom'; r.floor.mode = 'custom'; r.floor.asset = id; r.floor.scale = r.floor.scale || 1; }
     }, { detail: {} });
     renderAtmosphere();
-    toast('패턴을 적용했습니다. 반복 크기로 타일링을 조정하세요.');
+    if (kind === 'ceiling') toast(`천장화를 적용했습니다 (${Math.round(res.blob.size / 1024)}KB).`);
+    else toast('패턴을 적용했습니다. 반복 크기로 타일링을 조정하세요.');
   } catch (err) { toast('패턴 업로드 실패: ' + err.message, true); }
 }
 

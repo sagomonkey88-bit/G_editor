@@ -86,6 +86,7 @@ export function makeLobby(overrides = {}) {
     size: { w: 18, d: 12, h: 8, ...(overrides.size || {}) },
     wall: { preset: 'gray', pattern: false, ...(overrides.wall || {}) },
     floor: normalizeFloor({ preset: 'walnut-plank', ...(overrides.floor || {}) }),
+    ceiling: normalizeCeiling(overrides.ceiling), // P2(v1.6)
     lighting: { mood: 'warm', ambient: 0.85, ...(overrides.lighting || {}) },
     decor: { chandelier: true, columns: true, cofferedCeiling: true, goldTrim: true, carpet: true,
              ...(overrides.decor || {}) },
@@ -127,10 +128,23 @@ export function normalizeFloor(f = {}) {
   if (out.preset === 'custom') { out.scale = out.scale ?? 1; out.mirror = out.mirror ?? false; }
   return out;
 }
+// --- 천장 스타일 (v1.6 P2) — floor/wall 과 동일하게 room.ceiling 제자리 필드 ------
+// color(단색), lightIntensity(0~2 · 범용 방 조명 배수 — P3 미디어룸 재사용),
+// fixture(조명 소품 프리셋), muralImage(천장화 asset id)/muralMode(full|center).
+// 필드 부재 시 기존 외관과 동등: 색 #ece4d6, 밝기 1.0, 소품 none.
+export function normalizeCeiling(c = {}) {
+  const out = { ...c };
+  out.color = out.color || '#ece4d6';
+  out.lightIntensity = typeof out.lightIntensity === 'number' ? out.lightIntensity : 1.0;
+  out.fixture = out.fixture || 'none';
+  out.muralMode = out.muralMode === 'center' ? 'center' : 'full';
+  return out;
+}
 export function normalizeSurfaces(project) {
   const norm = (r) => {
     r.wall = normalizeWall(r.wall);
     r.floor = normalizeFloor(r.floor);
+    r.ceiling = normalizeCeiling(r.ceiling); // P2(v1.6)
     // P3: 면 단위 오버라이드도 동일 정규화
     if (r.wallFaces) {
       for (const k of Object.keys(r.wallFaces)) r.wallFaces[k] = normalizeWall(r.wallFaces[k]);
@@ -399,6 +413,7 @@ export function makeRoom(overrides = {}, index = 0) {
     size: { w: 12, d: 9, h: 4.2, ...(overrides.size || {}) },
     wall: { preset: 'deep-red', pattern: true, ...(overrides.wall || {}) },
     floor: normalizeFloor({ preset: 'walnut-herringbone', ...(overrides.floor || {}) }),
+    ceiling: normalizeCeiling(overrides.ceiling), // P2(v1.6)
     lighting: { mood: 'warm', ambient: 0.6, ...(overrides.lighting || {}) },
     decor: { benches: true, spotlights: true, ...(overrides.decor || {}) },
     // 마지막 룸은 exitDoor: null. 기본은 north 직진.

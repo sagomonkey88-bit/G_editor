@@ -179,7 +179,7 @@ export class ProjectStore extends EventTarget {
     if (this.selection.roomId === '__lobby__') {
       const lb = ensureLobby(this.project);
       return { id: '__lobby__', isLobby: true, name: '로비', intro: '',
-               size: lb.size, wall: lb.wall, wallFaces: lb.wallFaces, floor: lb.floor,
+               size: lb.size, wall: lb.wall, wallFaces: lb.wallFaces, floor: lb.floor, ceiling: lb.ceiling,
                lighting: lb.lighting, decor: lb.decor, exitDoor: null, artworks: lb.artworks,
                texts: lb.texts };
     }

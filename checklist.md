@@ -129,15 +129,16 @@
 - [x] 검증(viewer rebuild): oneWayColliders 1개, 충돌 hidden→visible 차단·visible→hidden 통과·슬라이드 허용. 숨김 쪽=연속 벽(문틀 없음·몰딩 이어짐, 각도뷰 확인), 보이는 쪽=열린 문 통과. 플랜 단방향 마커. usableWalls 'b' 북벽 개방. 콘솔 클린
 - [x] 커밋 `feat(v1.6): P1-2 …`
 
-## P2. 천장 시스템
-- [ ] schema.js: `ceilingStyle{color,lightIntensity,fixture,muralImage}` + normalize/ensure (기본 color #ece4d6, lightIntensity 1.0 = 현행)
-- [ ] world.js: 천장 색 = ceilingStyle.color (하드코딩 대체)
-- [ ] world.js: lightIntensity = 방 mood 포인트라이트 배수 = **범용 방 조명 제어(P3 재사용 전제)**
-- [ ] world.js: 절차적 조명 소품 3~4종(중앙 자동 스냅, 방 간 지오메트리 공유, emissive + 방당 포인트라이트 ≤1)
-- [ ] world.js/main.js: 천장화 이미지 텍스처(최대 2048px, 용량 안내) 전체/중앙 패널
-- [ ] app.js: renderAtmosphere 에 "천장" 그룹(색·밝기·소품·천장화) + 전체 일괄 버튼 (바닥 UI 패턴 재사용)
-- [ ] 검증: 방별 색·밝기·소품·천장화 개별 적용, 소품 10개 배치해도 에셋 1개분, 라운드트립, 콘솔 클린
-- [ ] 커밋 `feat(v1.6): P2 …`
+## P2. 천장 시스템 ✅ (커밋 완료)
+- [x] schema.js: `room.ceiling{color,lightIntensity,fixture,muralImage,muralMode}` (실제 필드명 room.wall/floor 관례에 맞춰 ceilingStyle 대신 ceiling). normalizeCeiling + normalizeSurfaces/makeRoom/makeLobby (기본 #ece4d6·밝기 1.0·소품 none = 구 외관 불변)
+- [x] world.js: 천장 색 = ceiling.color (하드코딩 대체)
+- [x] world.js: lightIntensity = mood 포인트라이트 배수 = **범용 방 조명(P3 재사용 전제)**
+- [x] world.js: 절차적 조명 소품 4종(샹들리에/펜던트/매입등/돔) — 공유 지오메트리/머티리얼(방 간 재사용=에셋 1개분), 중앙 자동, emissive, 실광원 방당 mood 1개 유지
+- [x] world.js/main.js/exporter.js: 천장화 텍스처(전체 map / 중앙 패널), 업로드 최대 2048px + 용량 안내, preload·export 자산 포함
+- [x] app.js: renderAtmosphere "천장" 그룹(색 피커+스와치·밝기 슬라이더·소품 셀렉트·천장화 업로드/모드·일괄) — 바닥 UI 패턴 재사용
+- [x] 검증(viewer): 방별 색(charcoal/white)·밝기(1.4/0.35)·샹들리에 렌더, 링/전구 지오 공유(방 2개 샹들리에 = geo 1벌), 천장화 전체·중앙 렌더. (editor) 5소품 셀렉트·컨트롤 적용, 무랄 3000→2048px 리사이즈, 저장→재로드 라운드트립, 콘솔 클린
+- [x] 참고: 소품 수동 이동(fixturePos)은 데이터·렌더 지원(중앙 자동 기본), 드래그 UI 는 미구현(후속) — 완료 기준엔 없음
+- [x] 커밋 `feat(v1.6): P2 …`
 
 ## 공통 (각 항목·세션 마무리)
 - [ ] 저장→재로드→내보내기 라운드트립 (displayDir·ceilingStyle 확인)

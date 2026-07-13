@@ -37,12 +37,12 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
   const rects = [{
     id: '__lobby__', rect: layout.lobby, size: { h: lobbyDef.size.h ?? 8 }, isLobby: true,
     wall: lobbyDef.wall || { color: '#5f5a53', pattern: 'plain' }, wallFaces: lobbyDef.wallFaces,
-    floor: lobbyDef.floor || { preset: 'walnut-plank' }, lobbyDef,
+    floor: lobbyDef.floor || { preset: 'walnut-plank' }, ceiling: lobbyDef.ceiling, lobbyDef,
   }];
   for (let i = 0; i < layout.rooms.length; i++) {
     const lr = layout.rooms[i];
     const room = project.rooms[i];
-    rects.push({ id: lr.id, rect: lr.rect, size: room.size, wall: room.wall, wallFaces: room.wallFaces, floor: room.floor, room, index: i });
+    rects.push({ id: lr.id, rect: lr.rect, size: room.size, wall: room.wall, wallFaces: room.wallFaces, floor: room.floor, ceiling: room.ceiling, room, index: i });
   }
 
   // ---- 바닥 + 천장 (rect 단위) ----
@@ -65,13 +65,39 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
     floor.receiveShadow = true;
     group.add(floor);
 
-    const ceil = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, d),
-      new THREE.MeshStandardMaterial({ color: 0xece4d6, roughness: 1.0, metalness: 0 })
-    );
+    // P2: 천장 색 + 천장화(전체/중앙 패널)
+    const cst = r.ceiling || {};
+    const ceilMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(cst.color || '#ece4d6'), roughness: 1.0, metalness: 0 });
+    const muralImg = cst.muralImage ? patternImages[cst.muralImage] : null;
+    if (muralImg && cst.muralMode !== 'center') {
+      const tex = new THREE.Texture(muralImg); tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true;
+      ceilMat.map = tex; ceilMat.color.set('#ffffff');
+    }
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w, d), ceilMat);
     ceil.rotation.x = Math.PI / 2;
     ceil.position.set(cx, h, cz);
     group.add(ceil);
+    if (muralImg && cst.muralMode === 'center') {
+      const pw = Math.min(w, d) * 0.6;
+      const tex = new THREE.Texture(muralImg); tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true;
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(pw, pw),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 1.0, metalness: 0 }));
+      panel.rotation.x = Math.PI / 2;
+      panel.position.set(cx, h - 0.02, cz);
+      group.add(panel);
+    }
+  }
+
+  // ---- 천장 조명 소품 (P2 — 절차적, 방 간 지오메트리/머티리얼 공유 = 에셋 1개분) ----
+  let fixtureAssets = null;
+  for (const r of rects) {
+    const cst = r.ceiling;
+    if (!cst || !cst.fixture || cst.fixture === 'none') continue;
+    if (!fixtureAssets) fixtureAssets = makeFixtureAssets();
+    const { rect } = r;
+    const fx = cst.fixturePos ? cst.fixturePos.x : (rect.xMin + rect.xMax) / 2;
+    const fz = cst.fixturePos ? cst.fixturePos.z : (rect.zMin + rect.zMax) / 2;
+    buildCeilingFixture(group, fixtureAssets, cst.fixture, fx, r.size.h, fz);
   }
 
   // ---- 벽 라인 유니온 (P3: 면 단위 스타일) ----
@@ -196,10 +222,12 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
     const lighting = r.isLobby ? r.lobbyDef.lighting : r.room.lighting;
     const mood = lighting?.mood || 'warm';
     const amb = lighting?.ambient ?? 0.6;
+    // P2: ceiling.lightIntensity = 범용 방 조명 배수 (기본 1.0 = 현행). P3 미디어룸이 재사용.
+    const li = r.ceiling?.lightIntensity ?? 1;
     const { rect } = r;
     const cx = (rect.xMin + rect.xMax) / 2, cz = (rect.zMin + rect.zMax) / 2;
     const radius = Math.max(rect.xMax - rect.xMin, rect.zMax - rect.zMin);
-    const pl = new THREE.PointLight(MOOD_COLOR[mood] || MOOD_COLOR.warm, amb * (r.isLobby ? 14 : 9), radius * 1.6, 1.4);
+    const pl = new THREE.PointLight(MOOD_COLOR[mood] || MOOD_COLOR.warm, amb * (r.isLobby ? 14 : 9) * li, radius * 1.6, 1.4);
     pl.position.set(cx, r.size.h - 0.5, cz);
     group.add(pl);
     moodLights.push({ light: pl, roomIndex: r.isLobby ? -1 : r.index });
@@ -560,6 +588,51 @@ function addCarpet(group, rect) {
     border.position.set(sx * (runW / 2 + 0.06), 0.007, (rect.zMin + rect.zMax) / 2);
     group.add(border);
   }
+}
+
+// --- 천장 조명 소품 (P2) — 절차적 생성. 공유 지오메트리/머티리얼로 방 간 재사용 -----
+// 광원은 실계산 대신 emissive (방당 실광원은 mood 포인트라이트 1개로 제한).
+function makeFixtureAssets() {
+  return {
+    mats: {
+      gold: new THREE.MeshStandardMaterial({ color: GOLD, metalness: 0.8, roughness: 0.35 }),
+      metal: new THREE.MeshStandardMaterial({ color: 0x2b2b30, metalness: 0.6, roughness: 0.4 }),
+      bulb: new THREE.MeshStandardMaterial({ color: 0xFFE9C0, emissive: 0xFFD9A0, emissiveIntensity: 2.0, roughness: 0.4 }),
+      shade: new THREE.MeshStandardMaterial({ color: 0xF4E7CC, emissive: 0xFFE7BE, emissiveIntensity: 0.8, roughness: 0.6 }),
+    },
+    geo: {
+      ring: new THREE.TorusGeometry(0.42, 0.03, 8, 24),
+      bulb: new THREE.SphereGeometry(0.06, 10, 8),
+      rod: new THREE.CylinderGeometry(0.018, 0.018, 1, 6),
+      cone: new THREE.ConeGeometry(0.24, 0.26, 18, 1, true),
+      disc: new THREE.CylinderGeometry(0.24, 0.24, 0.05, 22),
+      dome: new THREE.SphereGeometry(0.3, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5),
+    },
+  };
+}
+// 천장(ceilY)에 매달리는 소품. 프리셋: chandelier | pendant | recessed | dome.
+function buildCeilingFixture(group, assets, type, cx, ceilY, cz) {
+  const { mats, geo } = assets;
+  const g = new THREE.Group();
+  const rod = (mat, drop) => { const m = new THREE.Mesh(geo.rod, mat); m.scale.y = drop; m.position.y = -drop / 2; return m; };
+  if (type === 'chandelier') {
+    const drop = 1.3;
+    g.add(rod(mats.gold, drop));
+    const ring = new THREE.Mesh(geo.ring, mats.gold); ring.rotation.x = Math.PI / 2; ring.position.y = -drop; g.add(ring);
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; const b = new THREE.Mesh(geo.bulb, mats.bulb); b.position.set(Math.cos(a) * 0.42, -drop + 0.05, Math.sin(a) * 0.42); g.add(b); }
+    const c = new THREE.Mesh(geo.bulb, mats.bulb); c.position.y = -drop + 0.05; g.add(c);
+  } else if (type === 'pendant') {
+    const drop = 0.9;
+    g.add(rod(mats.metal, drop));
+    const cone = new THREE.Mesh(geo.cone, mats.metal); cone.position.y = -drop - 0.13; g.add(cone);
+    const b = new THREE.Mesh(geo.bulb, mats.bulb); b.position.y = -drop - 0.12; g.add(b);
+  } else if (type === 'recessed') {
+    const disc = new THREE.Mesh(geo.disc, mats.shade); disc.position.y = -0.025; g.add(disc);
+  } else if (type === 'dome') {
+    const dome = new THREE.Mesh(geo.dome, mats.shade); dome.position.y = -0.02; g.add(dome);
+  } else { return; }
+  g.position.set(cx, ceilY, cz);
+  group.add(g);
 }
 
 // --- 텍스트 오브젝트 렌더 (v1.3 P4 — 자유 배치) ------------------------------
