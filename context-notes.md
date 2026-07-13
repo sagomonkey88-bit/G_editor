@@ -134,3 +134,37 @@
 ## 검증 인프라
 - `node _devserver.mjs` (포트 8777, gitignored). 에디터 http://localhost:8777/editor/index.html, 뷰어 …/viewer/index.html?src=../samples/vincent-demo/museum.json
 - 백그라운드 탭 rAF 스로틀 → preview_screenshot 타임아웃 가능. renderer.render + canvas.toDataURL 로 캡처, mutate 후 ~1s 폴링 (livePreview 디바운스 300ms + 리빌드 비동기).
+
+---
+
+# v1.6 패치 컨텍스트 노트 (문 시스템·천장)
+
+작업 중 내린 결정과 이유. 다음 세션(P3~P4)이 재추론 없이 이어받기 위한 기록.
+
+## 세션 범위·승인된 결정 (2026-07-13)
+- **범위: P1(문) + P2(천장)만.** P3(미디어 룸)·P4(피날레)는 다음 세션. v1.5 PART B 문서는 v1.6 으로 대체됨 — 참조 안 함. 멀티유저 투어 모드 완전 제외(훅·필드도 금지).
+- **문 데이터 모델 = `exitDoor` 최소 확장** (사용자 선택). 방마다 단일 `exitDoor` 유지 + `displayDir` 필드만 추가. doors[] 배열 미채택 이유: 선형 관람 동선 모델과 정합, 자동배치/텔레포트 체인 로직 회귀 위험 최소, 완료 기준 충족. 한 방이 문 2개를 소유하는 분기는 불가하나 관람 동선에 불필요.
+- **조명 소품 = 절차적 생성** (사용자 선택). 기존 로비 샹들리에(addChandelier, world.js) 코드를 일반화 — GLTFLoader/GLB 파이프라인 없음, 용량 0, 방 간 지오메트리 공유. 스펙의 "저폴리 GLB" 문구와 다르나 용량 원칙(near-0·재사용)은 충족.
+
+## 사용자 추가 제약 (C1·C2 — checklist 검증 항목)
+- **C1. 기존 방 자동 이동 금지 (P1-4·P1-1).** 문 연결/드래그가 기존 방 이동을 요구하면 자동 이동 절대 금지. "방 OO를 이동합니다" 확인 다이얼로그(기존 confirmDialog, app.js 재사용) 필수. 대상 방이 다른 문으로 이미 연결됨 OR 이동 공간 없음 → 이동 차단 + 배치 불가(빨강). 드래그 코너 전환 시에도 연결 방이 못 맞닿으면 그 벽 구간 배치 불가. → createRoom 의 findFreeSpot 자동배치 관성을 P1-4/P1-1 문 생성 경로에는 적용하지 않는다. "이동할 공간 없음" = findFreeSpot 후보 없음, "다른 문으로 이미 연결됨" = 그 방이 자신의 exitDoor 로 유효 개구부를 이미 가짐(doorCovered).
+- **C2. lintel 상단 몰딩 최소주의 (P1-5).** lintel 몰딩은 스펙 외. 구 프로젝트 문 주변 변화가 "가로 띠 제거 + 몰딩 정리" 수준을 넘으면 lintel 몰딩 제외. vincent-demo before/after 육안 비교로 판단.
+
+## 현재 구조 파악 (착수 전 조사)
+- **문 = 단일 `exitDoor:{wall,offset}` 선형 체인** (schema.js makeRoom). 자유배치(origin) 이후에도 exitDoor 가 개구부 위치 결정, `doorCovered`(schema.js) 로 인접 공간 맞닿을 때만 뚫림. 로비 입장 문 = 북쪽 중앙 하드코딩(world.js).
+- 결합 지점: world.js(개구부 addOpening/벽 buildWallBox/로비 addGoldTrim), planView.js(_door/_dragDoor — 현재 한 벽 고정), elevationView.js(_door — wall 일치 시), app.js(룸 속성 exit-wall/offset, isLast 게이팅), autoLayout.js(entranceWallOf/usableWalls 체인 가정), placementRules.js(resolvePlacement 단일 door 회피), teleport.js(_openings), controls.js(콜라이더 AABB, 방 무관 위치 판정).
+- **조명**: 방 중앙 포인트라이트 1개 = `lighting.ambient` 세기, world.moodLights[{light,roomIndex}] 반환(모바일 라이트매니저 사용). 천장 = 0xece4d6 단색 하드코딩(world.js buildWorld 바닥/천장 루프).
+- **P1-5 버그 원인 확정**: 로비 addGoldTrim 이 코니스·골드 걸레받이(y≈0.19)를 벽 전체 폭 단일 박스로 그려 입장 문 개구부를 가로지름. 일반 벽 걸레받이/몰딩은 세그먼트별이라 가로로 안 걸리나, lintel 에 상단 몰딩이 없어 문 위에서 몰딩 선이 끊김.
+
+## 구현 설계 (항목별)
+- **P1-5**: world.js 만. buildLobbyDecor→addGoldTrim 에 개구부 구간 전달(현재 openings 는 buildWorld 지역변수 — addGoldTrim 호출 시점에 넘김). 코니스·걸레받이를 subtractIntervals 로 분할. lintel 몰딩은 C2 판단 후.
+- **P1-3**: planView.js 렌더만. DOOR_MARKER 상수(색·크기·최소px) 파일 상단 분리.
+- **P1-1**: planView.js _dragDoor 재작성 — 둘레 파라미터화(4벽 연속 좌표), 최근접 스냅, 코너 전환 시 wall+offset 갱신. 유효성은 doorCovered + 코너 최소거리 + 문 겹침. C1: 벽 전환 후보에서 연결 방 못 맞닿으면 빨강(방 이동 안 함).
+- **P1-4**: app.js. isLast 조건 제거, exit-wall/offset UI 를 마지막 방에도 노출. 연결 방 선택 UI = 인접 없을 때 방 목록 다이얼로그 → C1 규칙으로 이동 여부 결정(자동 이동 금지).
+- **P1-2**: schema displayDir 추가(makeRoom exitDoor 기본 both). world.js: 개구부는 뚫되 숨김 쪽 단면 패치 메시(THREE.FrontSide/BackSide, 숨김 방 벽 스타일 텍스처 + 걸레받이·몰딩 스트립). controls.js: colliders 에 {oneWay,axis,fixed,lo,hi,hiddenSign} 태그 추가, update() 이동 판정에서 방향 게이트(숨김 쪽 좌표에서 표시 쪽으로 넘는 이동만 차단). placementRules resolvePlacement: door 회피 대상에서 "이 면이 숨김 쪽인 문" 제외. planView: 단방향 = 반쪽+한쪽 화살표.
+  - **숨김/표시 방향 규약**: displayDir 'a'/'b' 는 문 소유 방(exitDoor 보유 룸) 기준과 상대 방 기준. 통행은 표시 쪽→숨김 쪽 허용(11→1), 숨김 쪽→표시 쪽 차단(1→11). 즉 "보이는 방에서 걸어 들어가고, 반대편에선 못 돌아온다".
+- **P2**: schema ceilingStyle + ensureCeiling(normalizeProject 체인 추가). world.js 천장 재질 색 = ceilingStyle.color, 밝기 = 포인트라이트 × lightIntensity(0~2, 기본 1). 소품 = 절차적(공유 지오메트리 clone, emissive, 방당 포인트라이트 ≤1, 천장 중앙 자동+수동 이동). 천장화 = ceilingStyle.muralImage(asset id) → main.js preloadPatterns 에 추가, 천장 plane map(전체/중앙 패널). UI = app.js renderAtmosphere "천장" 그룹(바닥 UI 재사용) + 일괄 버튼.
+
+## 검증 인프라 (재확인)
+- `node _devserver.mjs`(포트 8777) 또는 launch.json museum-dev-2(8778, 다른 세션이 8777 점유 시). 에디터 …/editor/index.html, 뷰어 …/viewer/index.html?src=../samples/vincent-demo/museum.json
+- 신규 뷰어 파일 추가 시 viewer/manifest.json 등록 필수(exporter 가 manifest 기준 복사). v1.6 은 기존 파일 수정만 예상 → manifest 변경 없음.
