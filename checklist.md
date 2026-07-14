@@ -214,3 +214,37 @@
 - [x] main.js: Seating(screens) 전달 + rebuild 시 screens 재부착·playerOpen 닫기
 - [x] 검증: 착석→fsBtn·활성영상, 오버레이 열림(video stage 이동·unmute·재생), 배속1.5·+10초 클램프·play/pause·시크·mute, 닫기(복귀·재음소거·동기화), FILM 25 프레임 렌더 확인, 콘솔 클린
 - [x] 커밋 `feat(v1.6): P3-4 …`
+
+# v1.7 사용자 피드백 패치 (2026-07-14)
+
+## F1. 영상 소리 재생 (음소거 강제 해제)
+- [ ] world.js buildScreen: 비음소거 자동재생 시도 → 차단 시 음소거 재생 + 첫 제스처에서 소리 켜기
+- [ ] main.js animate: 스크린 거리 기반 볼륨 감쇠 (다른 방에서 안 들리게)
+- [ ] seating.js closePlayer: 벽 스크린 강제 재음소거 제거
+- [ ] app.js 안내문구 갱신
+
+## F2. 방 전체 밝기 (lightIntensity 가 방 전체 표면에 적용)
+- [ ] world.js: 방별 dim 팩터 → 벽 면/바닥/천장/걸레받이/몰딩 머티리얼 색 감쇠
+- [ ] app.js 슬라이더 라벨 "방 전체 밝기"로
+
+## F3. 미디어 룸 전용 밝기 슬라이더 + 더 어두운 기본값
+- [ ] app.js 미디어 섹션에 밝기 슬라이더 추가 (ceiling.lightIntensity 공유)
+
+## F4. 착석 시 캐릭터 보이기 + 발 동동 애니메이션
+- [ ] avatar.js: 4종 빌더 feet 참조 수집 + updater pose 파라미터('seated' 발 번갈아 동동)
+- [ ] controls.js sit(): 카메라 측면 각도로 캐릭터 보이게, seated 분기 pose 전달
+
+## F5. 착석/플레이어 팝업 오류 수정
+- [ ] interact.js: 착석 중/플레이어 열림 시 자세히보기 프롬프트 숨김 + E 충돌 가드
+- [ ] main.js: interactions.seating 연결
+
+## F6. 피날레 부유 = 누워서 나는 포즈
+- [ ] avatar.js pose 'float': rig 눕히기 + 발 flutter
+- [ ] controls.js _updateFloat: pose 전달
+
+## F7. 하늘·바다 프리셋 그래픽 개선 (아래 바다/위 하늘/태양/반짝임/전진감)
+## F8. 바다속(ocean) 프리셋 추가 (schema FINALE_PRESETS + 에디터 seg + 뷰어)
+## F9. 랜덤 프리셋 방문마다 순환 (localStorage)
+## F10. 마무리 메시지 스타일 편집 (폰트/크기/색/위치) — schema msgStyle + 에디터 UI + 뷰어 적용
+## F11. preview=1 외부 접근 폴백 (./data/museum.json → 안내 메시지)
+## F12. viewer/data 에 publish.zip 데이터 추출 → /viewer/index.html 단독 관람
