@@ -14,6 +14,7 @@ const PITCH_DOWN_MAX = -0.6;           // 아래 약 34°
 const PITCH_DEFAULT = -0.23;           // 기존 프레이밍과 동등한 살짝 내려다보기
 const FLOOR_Y = 0.35, CEIL_SAFE = 3.3; // 카메라 바닥/보수적 천장 한계
 const SIT_Y = 0.32;                    // P3-2 착석 시 아바타 높이(좌석에 앉은 느낌)
+const FLOAT_ACC = 2.4, FLOAT_MAXV = 2.0, FLOAT_R = 14; // P4-3 부유: 가속·최고속·구형 경계 반경
 
 export class PlayerControls {
   constructor(avatar, camera, colliders, dom, opts = {}) {
@@ -32,6 +33,7 @@ export class PlayerControls {
     this.enabled = true;
     this.moving = false;
     this.seated = false; // P3-2 착석 상태
+    this.floatMode = false; // P4-3 피날레 부유 모드
     this.keys = new Set();
     this.joy = { active: false, x: 0, y: 0 };   // 모바일 조이스틱 (-1..1)
     this._drag = { on: false, px: 0, py: 0, moved: 0 };
@@ -164,6 +166,56 @@ export class PlayerControls {
     this.camDistTarget = CAM_DIST;
   }
 
+  // P4-3: 피날레 부유 모드 — 중력/충돌 off, 사인 보빙 + 관성 유영 + 구형 경계.
+  enterFloat(cx, cz) {
+    this.floatMode = true; this.seated = false;
+    this.floatCenter = { x: cx, z: cz };
+    this.floatVel = { x: 0, y: 0 };
+    this.floatT = 0; this.floatBaseY = 1.2;
+    this.pos.set(cx, cz);
+    this.camPitch = -0.05; this.camDistTarget = CAM_DIST;
+  }
+  exitFloat() { this.floatMode = false; this.avatar.position.y = 0; }
+
+  _updateFloat(dt) {
+    this.floatT += dt;
+    const inp = this._inputVector();
+    const f = this._forward(this.camYaw), r = this._right(this.camYaw);
+    let ax = f.x * inp.fwd + r.x * inp.str, az = f.y * inp.fwd + r.y * inp.str;
+    const len = Math.hypot(ax, az);
+    this.moving = len > 0.01;
+    if (this.moving) { ax /= len; az /= len; this.floatVel.x += ax * FLOAT_ACC * dt; this.floatVel.y += az * FLOAT_ACC * dt; this.avatarYaw = Math.atan2(ax, az); }
+    const damp = Math.pow(0.86, dt * 60);
+    this.floatVel.x *= damp; this.floatVel.y *= damp;
+    const vl = Math.hypot(this.floatVel.x, this.floatVel.y);
+    if (vl > FLOAT_MAXV) { this.floatVel.x *= FLOAT_MAXV / vl; this.floatVel.y *= FLOAT_MAXV / vl; }
+    this.pos.x += this.floatVel.x * dt; this.pos.y += this.floatVel.y * dt;
+    // 구형(원형) 경계 — 부드럽게 되밀림
+    const dx = this.pos.x - this.floatCenter.x, dz = this.pos.y - this.floatCenter.z, d = Math.hypot(dx, dz);
+    if (d > FLOAT_R) { const push = d - FLOAT_R; this.pos.x -= (dx / d) * push; this.pos.y -= (dz / d) * push; this.floatVel.x *= -0.25; this.floatVel.y *= -0.25; }
+    const bob = Math.sin(this.floatT * 0.85) * 0.2;
+    this.avatar.position.set(this.pos.x, this.floatBaseY + bob, this.pos.y);
+    this.avatar.rotation.y = smoothAngle(this.avatar.rotation.y, this.avatarYaw, dt * 4);
+    if (this.avatar.userData.update) this.avatar.userData.update(dt, this.moving, 0.4);
+    if (this.moving && this._t > this._manualUntil) this.camYaw = smoothAngle(this.camYaw, this.avatarYaw, dt * 1.5);
+    this._followFloat(dt, bob);
+  }
+  _followFloat(dt, bob) {
+    const headY = this.floatBaseY + bob + 1.0;
+    const f = this._forward(this.camYaw), p = this.camPitch, edist = 4.2;
+    const tx = this.pos.x - f.x * Math.cos(p) * edist;
+    const tz = this.pos.y - f.y * Math.cos(p) * edist;
+    const ty = headY + 0.4 - Math.sin(p) * edist;
+    const kp = 1 - Math.exp(-dt * 5);
+    this.camPos.x += (tx - this.camPos.x) * kp;
+    this.camPos.y += (ty - this.camPos.y) * kp;
+    this.camPos.z += (tz - this.camPos.z) * kp;
+    const shx = Math.sin(this.floatT * 1.3) * 0.05, shy = Math.sin(this.floatT * 0.9 + 1) * 0.06; // 무중력 미세 흔들림
+    this.camera.position.set(this.camPos.x + shx, this.camPos.y + shy, this.camPos.z);
+    this.camera.lookAt(this.pos.x, headY, this.pos.y);
+    this.avatar.visible = true;
+  }
+
   _inputVector() {
     let fwd = 0, str = 0;
     const k = this.keys;
@@ -211,6 +263,8 @@ export class PlayerControls {
       this.avatar.rotation.y = smoothAngle(this.avatar.rotation.y, this.avatarYaw, dt * 10);
       this._follow(dt); return;
     }
+    // P4-3: 피날레 부유 모드 (중력/충돌 off)
+    if (this.floatMode) { this._updateFloat(dt); return; }
 
     const inp = this._inputVector();
     // P3-2: 착석 중 — 이동 입력이 있으면 일어나고, 없으면 앉은 자세 유지(카메라는 스크린 향함)

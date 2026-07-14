@@ -10,6 +10,7 @@ import { HUD } from './hud.js';
 import { AutoWalk } from './autowalk.js';
 import { Teleport } from './teleport.js';
 import { Seating } from './seating.js';
+import { Finale } from './finale.js';
 import { AVATAR_PRESETS, LEGACY_PRESET_MAP } from './avatarPresets.js';
 
 const params = new URLSearchParams(location.search);
@@ -251,7 +252,7 @@ async function boot() {
   const b = layout.bounds;
   const target = { x: (b.xMin + b.xMax) / 2, y: 1.6, z: (b.zMin + b.zMax) / 2 };
 
-  let controls = null, interactions = null, orbit = null, avatar = null, hud = null, autowalk = null, editMode = null, teleport = null, seating = null;
+  let controls = null, interactions = null, orbit = null, avatar = null, hud = null, autowalk = null, editMode = null, teleport = null, seating = null, finale = null;
   const EDIT = params.get('preview') === '1' && params.get('edit') === '1' && !isMobile; // P2 (데스크톱 전용)
 
   // 갤러리 입장 (캐릭터 선택 후 / skipIntro 즉시) — HUD onEnter 와 임베드 진입 공용
@@ -282,6 +283,10 @@ async function boot() {
       touchButton: isMobile || coarse,
     });
     window.__museum.teleport = teleport;
+    // P4: 피날레 룸 — window.__museum 을 ctx 로 전달(리빌드 시 world/arts/project 참조 자동 갱신)
+    window.__museum.hudRoot = document.getElementById('hud');
+    finale = new Finale(window.__museum);
+    window.__museum.finale = finale;
   };
 
   if (DEBUG_CAM) {
@@ -335,6 +340,7 @@ async function boot() {
     if (controls) { controls.colliders = world.colliders; controls.oneWayColliders = world.oneWayColliders; }
     if (interactions) { interactions.anchors = arts.anchors; interactions.current = null; }
     if (seating) { if (seating.playerOpen) seating.closePlayer(); if (controls?.seated) controls.stand(); seating.anchors = world.benchAnchors; seating.screens = world.screens; seating.activeScreen = null; seating.near = null; seating.fsBtn.style.display = 'none'; }
+    if (finale?.active) finale.forceReset(); // P4: 리빌드 시 피날레 종료(씬 정리)
     if (autowalk) {
       autowalk.stop?.();
       autowalk.anchors = arts.anchors;
@@ -399,6 +405,7 @@ async function boot() {
       controls.update(dt);
       if (interactions) interactions.update(dt);
       if (seating) seating.update();
+      if (finale) finale.update(dt, currentRoomIndex(controls.pos, layout));
       // 라이트 매니저: 모바일은 현재 룸의 조명만 활성(§5.8)
       if (isMobile && (arts.spots.length || world.moodLights.length)) {
         const ci = currentRoomIndex(controls.pos, layout);

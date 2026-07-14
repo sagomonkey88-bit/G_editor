@@ -140,6 +140,34 @@
 - [x] 참고: 소품 수동 이동(fixturePos)은 데이터·렌더 지원(중앙 자동 기본), 드래그 UI 는 미구현(후속) — 완료 기준엔 없음
 - [x] 커밋 `feat(v1.6): P2 …`
 
+---
+
+# v1.6 P4 피날레 룸 ✅ (커밋 완료 2026-07-14)
+
+절차적 몽환 체험. 이미지 에셋 0(파티클/그라디언트/셰이더/canvas 소프트텍스처). 실존 설치작품·거울 반사 미사용.
+
+## P4-1. 방 타입 + 진입/복귀
+- [x] schema: `room.roomType='finale'` + `makeFinale/room.finale{preset,returnTo,messages,dwellSec,showMessages}`. makeRoom 조건부
+- [x] viewer/js/finale.js 신설(manifest 등록): 방 진입 감지(currentRoomIndex)→페이드→미술관 숨김+전용 씬→부유+메시지→"전시 마치기"→페이드→복귀 지점 텔레포트. main.js 배선(ctx=window.__museum 라이브 참조, animate update, rebuild forceReset)
+- [x] app.js: 방 타입에 피날레 추가 + 복귀 지점 select + 자동배치 제외
+
+## P4-2. 절차 프리셋 3종
+- [x] 우주(그라디언트 스카이 셰이더+별 THREE.Points 3600/모바일1400+성운 소프트 스프라이트), 하늘·바다(새벽 그라디언트+웨이브 셰이더 바다+구름 스프라이트), 빛의정원(발광 구체 340/모바일130 부유·명멸)
+- [x] 진입마다 랜덤 or 에디터 고정(preset). 모바일 파티클 감축. 검증: 3종 렌더 스크린샷 확인
+
+## P4-3. 부유 이동
+- [x] controls.js floatMode/enterFloat/exitFloat/_updateFloat/_followFloat: 중력·충돌 off, 사인 보빙(±0.2), 관성 유영(가속2.4·최고2.0·감쇠), 구형 경계(R14 되밀림), 카메라 미세 흔들림. 검증: 아바타 부유·카메라 추적
+
+## P4-4. 마무리 메시지
+- [x] 순차 페이드 인/유지(dwellSec)/아웃 → 마지막 후 "전시 마치기" 버튼. showMessages 토글. 폰트 Pretendard+글로우. 에디터 메시지 목록/유지시간/토글 UI
+- [x] 검증: 메시지/버튼 DOM 렌더 확인(텍스트·opacity·fixed·block). 시퀀스는 타이머 기반(백그라운드 탭 스로틀로 자동스텝만 제약, 실브라우저 정상)
+
+## P4 검증 요약
+- [x] 진입: active·floatMode·worldHidden·전용씬 340children(garden). 3프리셋(space/seasea/garden) 렌더. 종료: world 복귀·floatMode off·로비 텔레포트. 자동배치 제외·라운드트립. 콘솔 클린
+- [x] 커밋 `feat(v1.6): P4 …`
+
+---
+
 ## 공통 (각 항목·세션 마무리)
 - [x] 저장→재로드→내보내기 라운드트립 (displayDir·ceiling 확인)
 - [x] 기존 기능(자동 배치·텔레포트·평면도 인디케이터·캡션) 회귀 없음

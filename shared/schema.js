@@ -427,6 +427,18 @@ export function generateBenches(room, rect) {
   return benches;
 }
 
+// P4(v1.6): 피날레 룸 설정 — 절차 프리셋·복귀 지점·마무리 메시지.
+export const FINALE_PRESETS = Object.freeze(['random', 'space', 'seasea', 'garden']);
+export function makeFinale(overrides = {}) {
+  return {
+    preset: FINALE_PRESETS.includes(overrides.preset) ? overrides.preset : 'random', // random=진입마다 랜덤
+    returnTo: overrides.returnTo || '__lobby__', // 복귀 지점: '__lobby__' | roomId
+    messages: Array.isArray(overrides.messages) ? overrides.messages.filter(s => typeof s === 'string') : [],
+    dwellSec: typeof overrides.dwellSec === 'number' ? overrides.dwellSec : 4, // 메시지 줄당 유지 시간(초)
+    showMessages: overrides.showMessages !== false,
+  };
+}
+
 // P3(v1.6): 미디어 룸 스크린 — 16:9 고정, 벽면 배치. 부재=스크린 없음.
 export function makeScreen(overrides = {}) {
   return {
@@ -451,6 +463,7 @@ export function makeRoom(overrides = {}, index = 0) {
     // P3(v1.6): 방 타입 — 부재=gallery. media/finale 만 명시 저장(구 프로젝트 외관 불변).
     ...(overrides.roomType && overrides.roomType !== 'gallery' ? { roomType: overrides.roomType } : {}),
     ...(overrides.screen ? { screen: makeScreen(overrides.screen) } : {}),
+    ...(overrides.finale ? { finale: makeFinale(overrides.finale) } : {}),
     id,
     name: overrides.name || `${index + 1}. 새 섹션`,
     intro: overrides.intro || '',

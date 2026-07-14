@@ -4,7 +4,7 @@ import { LibraryPanel } from './libraryPanel.js';
 import { Inspector } from './inspector.js';
 import { PlanView } from './planView.js';
 import { ElevationView } from './elevationView.js';
-import { PRESETS, RANGES, LOBBY_RANGES, makeRoom, makeScreen, makeText, computeLayout, wallLength, wallLeftToWorld, LAYOUT, findOppositeFace, doorCovered } from '../../shared/schema.js';
+import { PRESETS, RANGES, LOBBY_RANGES, makeRoom, makeScreen, makeFinale, makeText, computeLayout, wallLength, wallLeftToWorld, LAYOUT, findOppositeFace, doorCovered } from '../../shared/schema.js';
 import { openPreview } from './previewBridge.js';
 import { LivePreview } from './livePreview.js';
 import { exportPublishZip } from './exporter.js';
@@ -295,9 +295,24 @@ function renderRoomProps() {
     ${isLobby ? '' : `
     <div class="field"><label>방 타입</label>
       <div class="seg" data-room-type>
-        <button data-v="gallery" class="${roomType === 'gallery' ? 'on' : ''}">일반 전시실</button>
-        <button data-v="media" class="${roomType === 'media' ? 'on' : ''}">미디어 룸</button>
+        <button data-v="gallery" class="${roomType === 'gallery' ? 'on' : ''}">일반</button>
+        <button data-v="media" class="${roomType === 'media' ? 'on' : ''}">미디어</button>
+        <button data-v="finale" class="${roomType === 'finale' ? 'on' : ''}">피날레</button>
       </div></div>
+    ${roomType === 'finale' && room.finale ? `
+    <div class="panel-title" style="margin-top:14px">피날레 (몽환 체험)</div>
+    <div class="hint-note">이 방에 들어서면 몽환 공간으로 전환됩니다. 절차적 연출(이미지 에셋 없음).</div>
+    <div class="field"><label>공간 프리셋</label>
+      <div class="seg" data-fin-preset>${[['random', '랜덤'], ['space', '우주'], ['seasea', '하늘·바다'], ['garden', '빛의 정원']].map(([v, l]) => `<button data-v="${v}" class="${(room.finale.preset || 'random') === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+    <div class="field"><label>복귀 지점 (전시 마치기 후)</label>
+      <select data-fin-return style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:7px">
+        <option value="__lobby__" ${room.finale.returnTo === '__lobby__' ? 'selected' : ''}>로비</option>
+        ${store.project.rooms.filter(r => r.id !== room.id).map(r => `<option value="${r.id}" ${room.finale.returnTo === r.id ? 'selected' : ''}>${attr(r.name)}</option>`).join('')}
+      </select></div>
+    <div class="toggle-row"><label>마무리 메시지 표시</label><div class="switch ${room.finale.showMessages !== false ? 'on' : ''}" data-fin-showmsg></div></div>
+    ${room.finale.showMessages !== false ? `
+    <div class="field"><label>메시지 (줄 단위 · 순서대로 표시)</label><textarea data-fin-messages rows="4" placeholder="전시는 어떠셨나요?&#10;재미있게 보셨나요?&#10;다음에 또 만나요">${text((room.finale.messages || []).join('\n'))}</textarea></div>
+    <div class="field"><label>줄당 유지 시간 (초)</label><input type="number" step="0.5" min="1" max="15" data-fin-dwell value="${room.finale.dwellSec ?? 4}"></div>` : ''}` : ''}
     ${roomType === 'media' && room.screen ? `
     <div class="panel-title" style="margin-top:14px">미디어 스크린 (16:9)</div>
     <div class="hint-note">미디어 룸은 조명이 자동으로 어두워집니다.</div>
@@ -442,18 +457,28 @@ function renderRoomProps() {
     const b = e.target.closest('button'); if (!b) return;
     const v = b.dataset.v;
     upd(r => {
-      if (v === 'gallery') { delete r.roomType; delete r.screen; }
+      if (v === 'gallery') { delete r.roomType; delete r.screen; delete r.finale; }
       else {
         r.roomType = v;
         if (v === 'media') {
+          delete r.finale;
           r.screen = r.screen || makeScreen({ wall: 'north' });
           r.ceiling = r.ceiling || {};
           if ((r.ceiling.lightIntensity ?? 1) >= 0.9) r.ceiling.lightIntensity = 0.3; // 자동 어두움
+        } else if (v === 'finale') {
+          delete r.screen;
+          r.finale = r.finale || makeFinale({});
         }
       }
     }, { silent: false });
     renderRoomProps(); renderAtmosphere();
   });
+  // P4: 피날레 설정
+  root.querySelector('[data-fin-preset]')?.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { upd(r => { if (r.finale) r.finale.preset = b.dataset.v; }, { silent: false }); renderRoomProps(); } });
+  root.querySelector('[data-fin-return]')?.addEventListener('change', e => upd(r => { if (r.finale) r.finale.returnTo = e.target.value; }, { silent: false }));
+  root.querySelector('[data-fin-showmsg]')?.addEventListener('click', () => { upd(r => { if (r.finale) r.finale.showMessages = r.finale.showMessages === false; }, { silent: false }); renderRoomProps(); });
+  root.querySelector('[data-fin-messages]')?.addEventListener('input', e => upd(r => { if (r.finale) r.finale.messages = e.target.value.split('\n').map(s => s.trim()).filter(s => s.length); }, { coalesce: `fin.msg:${room.id}` }));
+  root.querySelector('[data-fin-dwell]')?.addEventListener('input', e => upd(r => { if (r.finale) { const v = parseFloat(e.target.value); if (isFinite(v)) r.finale.dwellSec = Math.max(1, Math.min(15, v)); } }, { coalesce: `fin.dwell:${room.id}` }));
   root.querySelector('[data-screen-source]')?.addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) { upd(r => { if (r.screen) r.screen.source = b.dataset.v; }, { silent: false }); renderRoomProps(); } });
   root.querySelector('[data-screen-video]')?.addEventListener('change', e => uploadVideo(e.target.files[0], room.id));
   root.querySelector('[data-screen-video-clear]')?.addEventListener('click', () => { upd(r => { if (r.screen) r.screen.file = ''; }, { silent: false }); renderRoomProps(); });
