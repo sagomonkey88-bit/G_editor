@@ -414,6 +414,8 @@ async function boot() {
     requestAnimationFrame(animate);
     timer.update();
     const dt = Math.min(timer.getDelta(), 0.05);
+    // F1(v1.7): 입장 전(시작 화면)에는 스크린 영상 소리를 내지 않는다 (입장 후 거리 감쇠로 복귀)
+    if (!controls) for (const sc of (world.screens || [])) { if (sc.video) sc.video.volume = 0; }
     if (editMode) {
       editMode.update(dt);
     } else if (controls) {

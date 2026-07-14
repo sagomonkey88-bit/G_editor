@@ -217,14 +217,16 @@ const PRESETS = {
       vertexShader: 'uniform float time; varying float vh; void main(){ vec3 p=position; float w=sin(p.x*0.22+time*1.1)*0.34+cos(p.y*0.19+time*0.8)*0.28+sin((p.x+p.y)*0.09+time*0.5)*0.22; vh=w; gl_Position=projectionMatrix*modelViewMatrix*vec4(p.x,p.y,w,1.0); }',
       fragmentShader: 'varying float vh; uniform vec3 deep; uniform vec3 lite; void main(){ float t=clamp(vh*0.9+0.5,0.0,1.0); gl_FragColor=vec4(mix(deep,lite,t)+vh*0.12, 0.96); }',
     });
+    // 바다는 발 아래 멀리 — 하늘을 나는 높이감 (F7)
+    const WATER_Y = -3.4;
     const water = new THREE.Mesh(new THREE.PlaneGeometry(160, 160, IS_MOBILE ? 48 : 100, IS_MOBILE ? 48 : 100), wmat);
-    water.rotation.x = -Math.PI / 2; water.position.set(cx, -1.4, cz); group.add(water);
-    // 윤슬(물 위 반짝임) — 태양 방향으로 흐르는 포인트
+    water.rotation.x = -Math.PI / 2; water.position.set(cx, WATER_Y, cz); group.add(water);
+    // 윤슬(물 위 반짝임) — 소프트 원형 글로우 포인트
     const NS = IS_MOBILE ? 90 : 220;
     const spos = new Float32Array(NS * 3);
-    for (let i = 0; i < NS; i++) { spos[i * 3] = cx + (Math.random() * 2 - 1) * 45; spos[i * 3 + 1] = -1.0 + Math.random() * 0.3; spos[i * 3 + 2] = cz + (Math.random() * 2 - 1) * 45; }
+    for (let i = 0; i < NS; i++) { spos[i * 3] = cx + (Math.random() * 2 - 1) * 45; spos[i * 3 + 1] = WATER_Y + 0.45 + Math.random() * 0.2; spos[i * 3 + 2] = cz + (Math.random() * 2 - 1) * 45; }
     const sgeo = new THREE.BufferGeometry(); sgeo.setAttribute('position', new THREE.BufferAttribute(spos, 3));
-    const smat = new THREE.PointsMaterial({ color: 0xfff0c8, size: 0.22, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
+    const smat = new THREE.PointsMaterial({ map: softTexture('rgba(255,240,200,1)'), color: 0xfff0c8, size: 0.5, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
     group.add(new THREE.Points(sgeo, smat));
     // 구름: 위아래 두 층이 서로 다른 속도로 흘러 전진감 강화
     const cloudTex = softTexture('rgba(255,255,255,.95)');
@@ -268,7 +270,7 @@ const PRESETS = {
       bsp[i] = 0.5 + Math.random() * 1.1;
     }
     const bgeo = new THREE.BufferGeometry(); bgeo.setAttribute('position', new THREE.BufferAttribute(bpos, 3));
-    const bubbles = new THREE.Points(bgeo, new THREE.PointsMaterial({ color: 0xbfe8f5, size: 0.14, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const bubbles = new THREE.Points(bgeo, new THREE.PointsMaterial({ map: softTexture('rgba(210,240,255,.95)'), color: 0xbfe8f5, size: 0.22, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }));
     group.add(bubbles);
     // 물고기 떼: 절차 생성(타원 몸통 + 꼬리), 서로 다른 반경·높이·속도로 회유
     const fish = [];
@@ -285,7 +287,8 @@ const PRESETS = {
     }
     // 플랑크톤 부유 입자
     const dust = starPoints(IS_MOBILE ? 300 : 800, cx, cz);
-    dust.material.size = 0.06; dust.material.opacity = 0.4; dust.material.color.set(0x9fd0e0);
+    dust.material.size = 0.09; dust.material.opacity = 0.4; dust.material.color.set(0x9fd0e0);
+    dust.material.map = softTexture('rgba(200,235,245,.9)'); dust.material.needsUpdate = true;
     group.add(dust);
     let t = 0;
     return (dt) => {

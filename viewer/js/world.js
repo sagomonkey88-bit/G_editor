@@ -301,10 +301,10 @@ function addBenchAt(group, colliders, a, x, z, yaw) {
   for (const dx of [-0.7, 0.7]) { const leg = new THREE.Mesh(a.legGeo, a.legMat); leg.position.set(dx, 0.225, 0); g.add(leg); }
   g.position.set(x, 0, z); g.rotation.y = yaw;
   group.add(g);
-  // 회전 반영 AABB (seat 로컬 1.6×0.5)
+  // 회전 반영 AABB (seat 로컬 1.6×0.5). low=낮은 가구 — 카메라 충돌(F4 착석 측면뷰)에서 제외
   const ex = 0.8 * Math.abs(Math.cos(yaw)) + 0.25 * Math.abs(Math.sin(yaw));
   const ez = 0.8 * Math.abs(Math.sin(yaw)) + 0.25 * Math.abs(Math.cos(yaw));
-  colliders.push({ minX: x - ex, maxX: x + ex, minZ: z - ez, maxZ: z + ez });
+  colliders.push({ minX: x - ex, maxX: x + ex, minZ: z - ez, maxZ: z + ez, low: true });
 }
 
 // --- 미디어 룸 스크린 (P3-1) — 벽면 16:9 패널 + 얇은 어두운 프레임 ----------------
@@ -537,7 +537,7 @@ function addBench(group, colliders, cx, cz) {
   }
   g.position.set(cx, 0, cz);
   group.add(g);
-  colliders.push({ minX: cx - 0.8, maxX: cx + 0.8, minZ: cz - 0.25, maxZ: cz + 0.25 });
+  colliders.push({ minX: cx - 0.8, maxX: cx + 0.8, minZ: cz - 0.25, maxZ: cz + 0.25, low: true });
 }
 
 // ============================================================================

@@ -146,15 +146,15 @@ export class PlayerControls {
   }
 
   // P3-2: 벤치 착석 — 스크린(yaw) 향해 앉고 카메라 보정. 이동 입력 시 자동 일어나기.
-  // F4(v1.7): 카메라를 측면 사선으로 시작 — 앉은 캐릭터가 보이면서 스크린도 시야에 들어옴.
-  //           드래그로 자유 회전 가능, 영상 감상은 풀스크린 버튼 사용.
+  // F4(v1.7): 착석 카메라 = 앞-측면 뷰 — 벤치에 앉아 발을 동동거리는 캐릭터가 잘 보인다.
+  //           드래그로 자유 회전(스크린 방향 포함) 가능, 영상 감상은 풀스크린 버튼 사용.
   sit(x, z, yaw) {
     this.seated = true;
     this.pos.set(x, z);
     this.avatarYaw = yaw;
-    this.camYaw = yaw - 0.85;           // 측면 사선 뷰(캐릭터 + 스크린)
+    this.camYaw = yaw - 2.2;            // 앞-측면(약 126°) — 캐릭터 정면이 보이는 각도
     this.avatar.rotation.y = yaw;
-    this.camPitch = -0.1;
+    this.camPitch = -0.12;
     this.camDistTarget = Math.min(Math.max(this.camDistTarget, 2.2), 3.2);
     this.avatar.position.set(x, SIT_Y, z);
     this._follow(100);
@@ -357,6 +357,7 @@ export class PlayerControls {
   _segHit(x, z) {
     const M = 0.15;
     for (const c of this.colliders) {
+      if (c.low) continue; // F4(v1.7): 벤치 등 낮은 가구는 카메라를 막지 않음 (착석 측면뷰)
       if (x > c.minX - M && x < c.maxX + M && z > c.minZ - M && z < c.maxZ + M) return true;
     }
     return false;
