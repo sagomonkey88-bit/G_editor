@@ -267,6 +267,7 @@ async function boot() {
     });
     interactions = new Interactions(controls, arts.anchors, document.getElementById('hud'));
     seating = new Seating(controls, world.benchAnchors, world.screens, document.getElementById('hud')); // P3-2/P3-4 미디어 룸 착석·플레이어
+    interactions.seating = seating; // F5(v1.7): 착석/플레이어 중 자세히보기 프롬프트 억제
     window.__museum.seating = seating;
     hud?.attachControls(controls);
     const dwell = parseFloat(params.get('dwell')) || 4;

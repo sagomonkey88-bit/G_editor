@@ -146,13 +146,16 @@ export class PlayerControls {
   }
 
   // P3-2: 벤치 착석 — 스크린(yaw) 향해 앉고 카메라 보정. 이동 입력 시 자동 일어나기.
+  // F4(v1.7): 카메라를 측면 사선으로 시작 — 앉은 캐릭터가 보이면서 스크린도 시야에 들어옴.
+  //           드래그로 자유 회전 가능, 영상 감상은 풀스크린 버튼 사용.
   sit(x, z, yaw) {
     this.seated = true;
     this.pos.set(x, z);
-    this.avatarYaw = yaw; this.camYaw = yaw;
+    this.avatarYaw = yaw;
+    this.camYaw = yaw - 0.85;           // 측면 사선 뷰(캐릭터 + 스크린)
     this.avatar.rotation.y = yaw;
-    this.camPitch = -0.02;              // 살짝 위 = 스크린 향함
-    this.camDistTarget = Math.min(this.camDistTarget, 2.6);
+    this.camPitch = -0.1;
+    this.camDistTarget = Math.min(Math.max(this.camDistTarget, 2.2), 3.2);
     this.avatar.position.set(x, SIT_Y, z);
     this._follow(100);
   }
@@ -196,7 +199,7 @@ export class PlayerControls {
     const bob = Math.sin(this.floatT * 0.85) * 0.2;
     this.avatar.position.set(this.pos.x, this.floatBaseY + bob, this.pos.y);
     this.avatar.rotation.y = smoothAngle(this.avatar.rotation.y, this.avatarYaw, dt * 4);
-    if (this.avatar.userData.update) this.avatar.userData.update(dt, this.moving, 0.4);
+    if (this.avatar.userData.update) this.avatar.userData.update(dt, this.moving, 0.4, 'float'); // F6: 눕기 + 발 흔들기
     if (this.moving && this._t > this._manualUntil) this.camYaw = smoothAngle(this.camYaw, this.avatarYaw, dt * 1.5);
     this._followFloat(dt, bob);
   }
@@ -274,7 +277,7 @@ export class PlayerControls {
       } else {
         this.avatar.position.set(this.pos.x, SIT_Y, this.pos.y);
         this.avatar.rotation.y = smoothAngle(this.avatar.rotation.y, this.avatarYaw, dt * 10);
-        if (this.avatar.userData.update) this.avatar.userData.update(dt, false, 0);
+        if (this.avatar.userData.update) this.avatar.userData.update(dt, false, 0, 'seated'); // F4: 발 동동
         this._follow(dt);
         return;
       }

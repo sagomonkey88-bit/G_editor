@@ -118,13 +118,22 @@ export class Interactions {
   _bindKeys() {
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
-      if (k === 'e' && !this.isOpen && this.current) { e.preventDefault(); this.open(); }
+      // F5(v1.7): 착석/플레이어 중에는 E 가 작품 감상을 열지 않는다 (착석 E 와 충돌 방지)
+      if (k === 'e' && !this.isOpen && this.current && !this._suppressed()) { e.preventDefault(); this.open(); }
       else if (k === 'escape' && this.isOpen) { e.preventDefault(); this.close(); }
     });
   }
 
+  // F5(v1.7): 착석 중·플레이어 열림·벤치 근접("앉기" 우선) 시 작품 프롬프트 억제
+  // — 같은 E 키가 착석과 작품 감상을 동시에 여는 충돌 방지
+  _suppressed() { return !!(this.controls.seated || this.seating?.playerOpen || this.seating?.near); }
+
   update() {
     if (this.isOpen) return;
+    if (this._suppressed()) {
+      if (this.current) { this.current = null; this.prompt.style.display = 'none'; }
+      return;
+    }
     const px = this.controls.pos.x, pz = this.controls.pos.y;
     const yaw = this.controls.avatarYaw;
     const fx = Math.sin(yaw), fz = Math.cos(yaw);

@@ -170,9 +170,14 @@ function buildCapybara(rig, mats, P) {
   const A = P.arms;
   for (const sx of [-1, 1]) rig.add(sph(mats.body, A.r, ...A.s, sx * A.pos[0], A.pos[1], A.pos[2]));
 
-  // 발 ×2 (주둥이 색)
+  // 발 ×2 (주둥이 색) — F4(v1.7): 착석 발 동동 애니메이션용 참조 수집
   const F = P.feet;
-  for (const sx of [-1, 1]) rig.add(sph(mats.muzzle, F.r, ...F.s, sx * F.pos[0], F.pos[1], F.pos[2], false));
+  parts.feetL = []; parts.feetR = [];
+  for (const sx of [-1, 1]) {
+    const foot = sph(mats.muzzle, F.r, ...F.s, sx * F.pos[0], F.pos[1], F.pos[2], false);
+    rig.add(foot);
+    (sx < 0 ? parts.feetL : parts.feetR).push(foot);
+  }
 
   // 꼬리
   rig.add(sph(mats.body, P.tail.r, 1, 1, 1, ...P.tail.pos, false));
@@ -244,12 +249,16 @@ function buildOwl(rig, mats, P) {
   };
   parts.swingL = mkWing(-1);
   parts.swingR = mkWing(1);
-  // 발 ×2 + 발가락 ×3
+  // 발 ×2 + 발가락 ×3 — F4(v1.7): 착석 발 동동용 참조(발가락 포함)
   const F = P.feet;
+  parts.feetL = []; parts.feetR = [];
   for (const sx of [-1, 1]) {
-    rig.add(sph(mats.accent, F.r, ...F.s, sx * F.pos[0], F.pos[1], F.pos[2], false));
+    const side = sx < 0 ? parts.feetL : parts.feetR;
+    const foot = sph(mats.accent, F.r, ...F.s, sx * F.pos[0], F.pos[1], F.pos[2], false);
+    rig.add(foot); side.push(foot);
     for (const k of [-1, 0, 1]) {
-      rig.add(sph(mats.accent, F.toes.r, 1, 0.8, 1.2, sx * F.pos[0] + k * F.toes.dx, F.pos[1] - 0.01, F.pos[2] + F.toes.dz, false));
+      const toe = sph(mats.accent, F.toes.r, 1, 0.8, 1.2, sx * F.pos[0] + k * F.toes.dx, F.pos[1] - 0.01, F.pos[2] + F.toes.dz, false);
+      rig.add(toe); side.push(toe);
     }
   }
   // 꼬리
@@ -356,9 +365,14 @@ function buildRabbit(rig, mats, P) {
   parts.swingL = mkArm(-1);
   parts.swingR = mkArm(1);
 
-  // 발·꼬리
+  // 발·꼬리 — F4(v1.7): 착석 발 동동용 참조
   const F = P.feet;
-  for (const sx of [-1, 1]) rig.add(sph(mats.body, F.r, ...F.s, sx * F.pos[0], F.pos[1], F.pos[2], false));
+  parts.feetL = []; parts.feetR = [];
+  for (const sx of [-1, 1]) {
+    const foot = sph(mats.body, F.r, ...F.s, sx * F.pos[0], F.pos[1], F.pos[2], false);
+    rig.add(foot);
+    (sx < 0 ? parts.feetL : parts.feetR).push(foot);
+  }
   rig.add(sph(mats.body, P.tail.r, 1, 1, 1, ...P.tail.pos, false));
   return parts;
 }
@@ -510,9 +524,14 @@ function buildDragon(rig, mats, P) {
   parts.swingL = mkArm(-1);
   parts.swingR = mkArm(1);
 
-  // 발 ×2
+  // 발 ×2 — F4(v1.7): 착석 발 동동용 참조
   const F = P.feet;
-  for (const sx of [-1, 1]) rig.add(sph(mats.body, F.r, ...F.s, sx * F.pos[0], F.pos[1], F.pos[2], false));
+  parts.feetL = []; parts.feetR = [];
+  for (const sx of [-1, 1]) {
+    const foot = sph(mats.body, F.r, ...F.s, sx * F.pos[0], F.pos[1], F.pos[2], false);
+    rig.add(foot);
+    (sx < 0 ? parts.feetL : parts.feetR).push(foot);
+  }
   return parts;
 }
 
@@ -522,12 +541,31 @@ const BUILDERS = { owl: buildOwl, capybara: buildCapybara, rabbit: buildRabbit, 
 // 걷기: 바운스 ±0.03m + 롤 ±3.5° (+분리형·부엉이 팔 스윙 ±15°)
 // 부속물 관성: 보행 위상 지연 + 가감속 스프링 (±5° 스케일)
 // 유휴: 숨쉬기 ±1% (2.5s) + 8초 주기 미세 둘러보기
+// F4/F6(v1.7): pose 파라미터 — 'seated'(발 번갈아 동동) | 'float'(눕기 + 발 흔들기) | 기본 걷기
 function makeUpdater(rig, parts) {
   let phase = 0, t = 0, amp = 0, prevSpeed = 0;
   let apVel = 0, apRot = 0;
+  let poseT = 0, rigTilt = 0;
   const breathBaseY = parts.breath ? parts.breath.scale.y : 1;
-  return function update(dt, moving, speed01) {
+  const feetInit = (list) => { for (const m of (list || [])) if (m.userData._fy === undefined) { m.userData._fy = m.position.y; m.userData._fr = m.rotation.x; } };
+  feetInit(parts.feetL); feetInit(parts.feetR);
+  const setFeet = (list, lift, kick) => { for (const m of (list || [])) { m.position.y = m.userData._fy + lift; m.rotation.x = m.userData._fr - kick; } };
+  return function update(dt, moving, speed01, pose) {
     t += dt;
+    // F4: 착석/부유 시 발 번갈아 동동 (좌우 교대 들썩임 + 앞차기 살짝)
+    if ((pose === 'seated' || pose === 'float') && parts.feetL?.length) {
+      poseT += dt;
+      const sw = Math.sin(poseT * (pose === 'seated' ? 5.6 : 3.2));
+      setFeet(parts.feetL, Math.max(0, sw) * 0.09, sw * 0.45);
+      setFeet(parts.feetR, Math.max(0, -sw) * 0.09, -sw * 0.45);
+    } else if (parts.feetL?.length) {
+      setFeet(parts.feetL, 0, 0); setFeet(parts.feetR, 0, 0);
+    }
+    // F6: 부유 모드 = 하늘을 보고 누운 포즈 (이동 중엔 머리를 살짝 든다)
+    const targetTilt = pose === 'float' ? (moving ? -1.05 : -1.3) : 0;
+    rigTilt += (targetTilt - rigTilt) * Math.min(1, dt * 3);
+    rig.rotation.x = rigTilt;
+    rig.position.z = Math.sin(-rigTilt) * 0.55; // 눕으면 몸이 뒤로 밀리는 것 보정
     const speed = moving ? (speed01 ?? 1) : 0;
     amp += ((moving ? 1 : 0) - amp) * Math.min(1, dt * 8);
     if (moving) phase += dt * (7 + 4 * speed);
