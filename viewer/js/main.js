@@ -49,16 +49,31 @@ async function loadData() {
 }
 
 function loadFromPreview() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    let done = false;
     // 부모 창(같은 출처의 에디터)에 준비 신호를 보내고 데이터 수신 대기.
     // window.open(팝업) = opener, iframe 임베드(P1) = parent.
     window.addEventListener('message', (e) => {
-      if (e.origin === location.origin && e.data && e.data.type === 'museum-preview-data') {
+      if (!done && e.origin === location.origin && e.data && e.data.type === 'museum-preview-data') {
+        done = true;
         resolve({ project: e.data.project, baseDir: '', blobs: e.data.blobs || null });
       }
     });
     const host = window.opener || (window.parent !== window ? window.parent : null);
     if (host) host.postMessage({ type: 'museum-preview-ready' }, location.origin);
+    // F11(v1.7): 에디터 없이 링크만 공유받아 연 경우(외부 접속) — 에디터 데이터가 오지 않으므로
+    // ./data/museum.json(퍼블리시 테스트본)으로 폴백. 그것도 없으면 안내 메시지.
+    setTimeout(async () => {
+      if (done) return;
+      try {
+        const res = await fetch('./data/museum.json');
+        if (res.ok) { done = true; resolve({ project: await res.json(), baseDir: './data/', blobs: null }); return; }
+      } catch (e) { /* 폴백 데이터 없음 */ }
+      if (!host) {
+        done = true;
+        reject(new Error('이 링크는 에디터 미리보기 전용입니다. 다른 사람과 공유하려면 [내보내기]로 만든 배포본 주소를 보내거나, 배포본의 data 폴더를 viewer/data 로 복사해 주세요.'));
+      }
+    }, host ? 4000 : 600);
   });
 }
 

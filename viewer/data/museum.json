@@ -1,0 +1,1367 @@
+{
+  "schemaVersion": 2,
+  "meta": {
+    "slug": "my-museum",
+    "title": "새 미술관",
+    "subtitle": "",
+    "curator": "",
+    "intro": "",
+    "createdAt": "2026-07-14",
+    "language": "ko",
+    "deployUrl": ""
+  },
+  "titleStyle": {
+    "font": "serif",
+    "weight": 700,
+    "sizeCm": 28,
+    "color": "#F2E9DB",
+    "letterSpacing": 0.06,
+    "lineHeight": 1.35
+  },
+  "introStyle": {
+    "font": "sans",
+    "weight": 400,
+    "sizeCm": 9,
+    "color": "#D9C9A8",
+    "letterSpacing": 0.02,
+    "lineHeight": 1.7
+  },
+  "titlePanel": {
+    "align": "center",
+    "bg": "none",
+    "widthCm": 900,
+    "light": {
+      "on": true,
+      "intensity": 1.2,
+      "temp": "warm"
+    }
+  },
+  "lobby": {
+    "size": {
+      "w": 18,
+      "d": 12,
+      "h": 8
+    },
+    "wall": {
+      "preset": "gray",
+      "pattern": "plain",
+      "color": "#5f5a53",
+      "patternOpacity": 1,
+      "patternScale": 2.6,
+      "patternMirror": false
+    },
+    "floor": {
+      "preset": "walnut-plank",
+      "mode": "preset",
+      "color": "#6b4a30",
+      "roughness": "matte"
+    },
+    "ceiling": {
+      "color": "#ece4d6",
+      "lightIntensity": 1,
+      "fixture": "none",
+      "muralMode": "full"
+    },
+    "lighting": {
+      "mood": "warm",
+      "ambient": 0.85
+    },
+    "decor": {
+      "chandelier": true,
+      "columns": true,
+      "cofferedCeiling": true,
+      "goldTrim": true,
+      "carpet": true
+    },
+    "artworks": [],
+    "texts": [
+      {
+        "id": "tx-title",
+        "role": "title",
+        "text": "",
+        "placement": {
+          "wall": "north",
+          "x": 9,
+          "centerHeightCm": 340
+        },
+        "widthCm": 900,
+        "style": {
+          "font": "serif",
+          "weight": 700,
+          "italic": false,
+          "sizeCm": 28,
+          "color": "#F2E9DB",
+          "letterSpacing": 0.06,
+          "lineHeight": 1.35,
+          "shadow": "none",
+          "shadowColor": ""
+        },
+        "panel": {
+          "align": "center",
+          "bg": "none"
+        },
+        "light": {
+          "on": true,
+          "intensity": 1.2,
+          "temp": "warm"
+        }
+      },
+      {
+        "id": "tx-intro",
+        "role": "intro",
+        "text": "",
+        "placement": {
+          "wall": "north",
+          "x": 6,
+          "centerHeightCm": 155
+        },
+        "widthCm": 340,
+        "style": {
+          "font": "sans",
+          "weight": 400,
+          "italic": false,
+          "sizeCm": 9,
+          "color": "#D9C9A8",
+          "letterSpacing": 0.02,
+          "lineHeight": 1.7,
+          "shadow": "none",
+          "shadowColor": ""
+        },
+        "panel": {
+          "align": "left",
+          "bg": "none"
+        },
+        "light": {
+          "on": false,
+          "intensity": 1,
+          "temp": "warm"
+        }
+      }
+    ]
+  },
+  "autoLayout": {
+    "scaleSetting": 3.5,
+    "gapChar": 1.2,
+    "clockwise": true,
+    "protectManual": true,
+    "autoSizeRoom": true
+  },
+  "avatarDefaults": {
+    "preset": "capybara",
+    "body": "default",
+    "garment": "#8DA98A"
+  },
+  "route": [
+    "aw-fbk7f3",
+    "aw-fbkid4",
+    "aw-fbkxx5",
+    "aw-fblt46",
+    "aw-fblwt7",
+    "aw-fbvpf8",
+    "aw-fbvu19",
+    "aw-fbw04a",
+    "aw-fbw4ab",
+    "aw-fbw8hc",
+    "aw-fcszke",
+    "aw-fct5mf",
+    "aw-fct9cg",
+    "aw-fctn6h",
+    "aw-fcu2yi"
+  ],
+  "rooms": [
+    {
+      "id": "room-fbcoh1",
+      "name": "1. 첫 번째 섹션",
+      "intro": "",
+      "introTitleStyle": {
+        "font": "serif",
+        "weight": 700,
+        "sizeCm": 12,
+        "color": "#3A2F24",
+        "letterSpacing": 0.04,
+        "lineHeight": 1.4
+      },
+      "introBodyStyle": {
+        "font": "sans",
+        "weight": 400,
+        "sizeCm": 6.5,
+        "color": "#5A4C3C",
+        "letterSpacing": 0.01,
+        "lineHeight": 1.75
+      },
+      "introPanel": {
+        "align": "left",
+        "bg": "light",
+        "widthCm": 260,
+        "light": {
+          "on": false,
+          "intensity": 1,
+          "temp": "warm"
+        }
+      },
+      "size": {
+        "w": 12,
+        "d": 19.18,
+        "h": 4.2
+      },
+      "wall": {
+        "preset": "deep-red",
+        "pattern": "damask",
+        "color": "#5e2626",
+        "patternOpacity": 1,
+        "patternScale": 2.6,
+        "patternMirror": false
+      },
+      "floor": {
+        "preset": "walnut-herringbone",
+        "mode": "preset",
+        "color": "#6b4a30",
+        "roughness": "matte"
+      },
+      "ceiling": {
+        "color": "#ece4d6",
+        "lightIntensity": 1,
+        "fixture": "none",
+        "muralMode": "full"
+      },
+      "lighting": {
+        "mood": "warm",
+        "ambient": 0.6
+      },
+      "decor": {
+        "benches": true,
+        "spotlights": true
+      },
+      "exitDoor": {
+        "wall": "north",
+        "offset": 6
+      },
+      "artworks": [
+        {
+          "id": "aw-fbk7f3",
+          "image": "assets/artworks/aw-fbk7f3.webp",
+          "thumb": "assets/thumbs/aw-fbk7f3.webp",
+          "file": "Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project_-_edited.jpg",
+          "meta": {
+            "titleKo": "",
+            "titleEn": "Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project_-_edited",
+            "artistKo": "",
+            "artistEn": "",
+            "year": "",
+            "description": "",
+            "source": "manual",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project_-_edited",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 445.8,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "west",
+            "x": 3.76,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-fbkid4",
+          "image": "assets/artworks/aw-fbkid4.webp",
+          "thumb": "assets/thumbs/aw-fbkid4.webp",
+          "file": "The_Creation_of_Adam_perspective_fix.jpg",
+          "meta": {
+            "titleKo": "아담의 창조",
+            "titleEn": "The Creation of Adam",
+            "artistKo": "미켈란젤로",
+            "artistEn": "Michelangelo",
+            "year": "c. 1512",
+            "description": "시스티나 예배당 천장화의 중심 장면으로, 신이 손끝으로 아담에게 생명을 불어넣는 순간을 그렸다. 맞닿을 듯 말 듯 떨어져 있는 두 손가락은 서양 미술에서 가장 유명한 이미지 중 하나가 되었다.",
+            "source": "auto",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "아담의 창조",
+            "artist": "미켈란젤로",
+            "year": "c. 1512",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 601.4,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "west",
+            "x": 10.01,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-fbkxx5",
+          "image": "assets/artworks/aw-fbkxx5.webp",
+          "thumb": "assets/thumbs/aw-fbkxx5.webp",
+          "file": "_The_School_of_Athens__by_Raffaello_Sanzio_da_Urbino.jpg",
+          "meta": {
+            "titleKo": "아테네 학당",
+            "titleEn": "The School of Athens",
+            "artistKo": "라파엘로",
+            "artistEn": "Raphael",
+            "year": "1509–1511",
+            "description": "바티칸 궁전 서명의 방에 그려진 벽화로, 플라톤과 아리스토텔레스를 중심으로 고대 그리스 철학자들이 한자리에 모인 장면을 담았다. 완벽한 원근법 구성과 인물들의 조화로 전성기 르네상스의 정수로 꼽힌다.",
+            "source": "auto",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "아테네 학당",
+            "artist": "라파엘로",
+            "year": "1509–1511",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 360.9,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "west",
+            "x": 15.85,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-fblt46",
+          "image": "assets/artworks/aw-fblt46.webp",
+          "thumb": "assets/thumbs/aw-fblt46.webp",
+          "file": "Mona_Lisa,_by_Leonardo_da_Vinci,_from_C2RMF_natural_color.jpg",
+          "meta": {
+            "titleKo": "",
+            "titleEn": "Mona_Lisa,_by_Leonardo_da_Vinci,_from_C2RMF_natural_color",
+            "artistKo": "",
+            "artistEn": "",
+            "year": "",
+            "description": "",
+            "source": "manual",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "Mona_Lisa,_by_Leonardo_da_Vinci,_from_C2RMF_natural_color",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 187.5,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "east",
+            "x": 6.41,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-fblwt7",
+          "image": "assets/artworks/aw-fblwt7.webp",
+          "thumb": "assets/thumbs/aw-fblwt7.webp",
+          "file": "Masaccio,_trinità.jpg",
+          "meta": {
+            "titleKo": "",
+            "titleEn": "Masaccio,_trinità",
+            "artistKo": "",
+            "artistEn": "",
+            "year": "",
+            "description": "",
+            "source": "manual",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "Masaccio,_trinità",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 138.9,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "east",
+            "x": 13.01,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        }
+      ],
+      "origin": {
+        "x": -6,
+        "z": -19.18
+      },
+      "texts": [
+        {
+          "id": "tx-sec-room-fbcoh1",
+          "role": "section",
+          "text": "",
+          "placement": {
+            "wall": "south",
+            "x": 8.6,
+            "centerHeightCm": 160
+          },
+          "widthCm": 260,
+          "style": {
+            "font": "serif",
+            "weight": 700,
+            "italic": false,
+            "sizeCm": 12,
+            "color": "#3A2F24",
+            "letterSpacing": 0.04,
+            "lineHeight": 1.4,
+            "shadow": "none",
+            "shadowColor": ""
+          },
+          "bodyStyle": {
+            "italic": false,
+            "shadow": "none",
+            "shadowColor": "",
+            "font": "sans",
+            "weight": 400,
+            "sizeCm": 6.5,
+            "color": "#5A4C3C",
+            "letterSpacing": 0.01,
+            "lineHeight": 1.75
+          },
+          "panel": {
+            "align": "left",
+            "bg": "light"
+          },
+          "light": {
+            "on": false,
+            "intensity": 1,
+            "temp": "warm"
+          }
+        }
+      ]
+    },
+    {
+      "id": "room-fbcoi2",
+      "name": "2. 두 번째 섹션",
+      "intro": "",
+      "introTitleStyle": {
+        "font": "serif",
+        "weight": 700,
+        "sizeCm": 12,
+        "color": "#3A2F24",
+        "letterSpacing": 0.04,
+        "lineHeight": 1.4
+      },
+      "introBodyStyle": {
+        "font": "sans",
+        "weight": 400,
+        "sizeCm": 6.5,
+        "color": "#5A4C3C",
+        "letterSpacing": 0.01,
+        "lineHeight": 1.75
+      },
+      "introPanel": {
+        "align": "left",
+        "bg": "light",
+        "widthCm": 260,
+        "light": {
+          "on": false,
+          "intensity": 1,
+          "temp": "warm"
+        }
+      },
+      "size": {
+        "w": 19.99,
+        "d": 7.76,
+        "h": 4.2
+      },
+      "wall": {
+        "preset": "deep-red",
+        "pattern": "damask",
+        "color": "#5e2626",
+        "patternOpacity": 1,
+        "patternScale": 2.6,
+        "patternMirror": false
+      },
+      "floor": {
+        "preset": "walnut-herringbone",
+        "mode": "preset",
+        "color": "#6b4a30",
+        "roughness": "matte"
+      },
+      "ceiling": {
+        "color": "#ece4d6",
+        "lightIntensity": 1,
+        "fixture": "none",
+        "muralMode": "full"
+      },
+      "lighting": {
+        "mood": "warm",
+        "ambient": 0.6
+      },
+      "decor": {
+        "benches": true,
+        "spotlights": true
+      },
+      "exitDoor": {
+        "wall": "north",
+        "offset": 17.63
+      },
+      "artworks": [
+        {
+          "id": "aw-fbvpf8",
+          "image": "assets/artworks/aw-fbvpf8.webp",
+          "thumb": "assets/thumbs/aw-fbvpf8.webp",
+          "file": "1665_Girl_with_a_Pearl_Earring.jpg",
+          "meta": {
+            "titleKo": "진주 귀걸이를 한 소녀",
+            "titleEn": "Girl with a Pearl Earring",
+            "artistKo": "요하네스 페르메이르",
+            "artistEn": "Johannes Vermeer",
+            "year": "c. 1665",
+            "description": "네덜란드 황금기 회화의 대표작으로, 터번을 두른 소녀가 어깨 너머로 관람자를 돌아보는 순간을 포착했다. 진주 귀걸이에 맺힌 빛과 부드러운 명암 처리가 신비로운 분위기를 만든다.",
+            "source": "auto",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "진주 귀걸이를 한 소녀",
+            "artist": "요하네스 페르메이르",
+            "year": "c. 1665",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 236.4,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "west",
+            "x": 2.43,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-fbvu19",
+          "image": "assets/artworks/aw-fbvu19.webp",
+          "thumb": "assets/thumbs/aw-fbvu19.webp",
+          "file": "Rembrandt_van_Rijn_-_Self-Portrait_-_Google_Art_Project.jpg",
+          "meta": {
+            "titleKo": "두 개의 원이 있는 자화상",
+            "titleEn": "Self-Portrait with Two Circles",
+            "artistKo": "렘브란트",
+            "artistEn": "Rembrandt",
+            "year": "c. 1665–1669",
+            "description": "팔레트와 붓을 든 노년의 화가가 두 개의 원이 그려진 벽 앞에 서 있는 자화상이다. 평생에 걸쳐 자화상을 그린 렘브란트 만년의 원숙한 경지를 보여주는 작품으로, 원의 의미를 둘러싼 해석이 분분하다.",
+            "source": "auto",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "두 개의 원이 있는 자화상",
+            "artist": "렘브란트",
+            "year": "c. 1665–1669",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 216.1,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "west",
+            "x": 5.43,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-fbw04a",
+          "image": "assets/artworks/aw-fbw04a.webp",
+          "thumb": "assets/thumbs/aw-fbw04a.webp",
+          "file": "La_ronda_de_noche,_por_Rembrandt_van_Rijn.jpg",
+          "meta": {
+            "titleKo": "",
+            "titleEn": "La_ronda_de_noche,_por_Rembrandt_van_Rijn",
+            "artistKo": "",
+            "artistEn": "",
+            "year": "",
+            "description": "",
+            "source": "manual",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "La_ronda_de_noche,_por_Rembrandt_van_Rijn",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 344.3,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "north",
+            "x": 2.97,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-fbw4ab",
+          "image": "assets/artworks/aw-fbw4ab.webp",
+          "thumb": "assets/thumbs/aw-fbw4ab.webp",
+          "file": "GENTILESCHI_Judith.jpg",
+          "meta": {
+            "titleKo": "",
+            "titleEn": "GENTILESCHI_Judith",
+            "artistKo": "",
+            "artistEn": "",
+            "year": "",
+            "description": "",
+            "source": "manual",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "GENTILESCHI_Judith",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 230,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "north",
+            "x": 6.58,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-fbw8hc",
+          "image": "assets/artworks/aw-fbw8hc.webp",
+          "thumb": "assets/thumbs/aw-fbw8hc.webp",
+          "file": "Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project_-_edited.jpg",
+          "meta": {
+            "titleKo": "",
+            "titleEn": "Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project_-_edited",
+            "artistKo": "",
+            "artistEn": "",
+            "year": "",
+            "description": "",
+            "source": "manual",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project_-_edited",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 296.4,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "east",
+            "x": 3.88,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        }
+      ],
+      "origin": {
+        "x": -5.35,
+        "z": -26.94
+      },
+      "texts": [
+        {
+          "id": "tx-sec-room-fbcoi2",
+          "role": "section",
+          "text": "",
+          "placement": {
+            "wall": "south",
+            "x": 7.08,
+            "centerHeightCm": 160
+          },
+          "widthCm": 260,
+          "style": {
+            "font": "serif",
+            "weight": 700,
+            "italic": false,
+            "sizeCm": 12,
+            "color": "#3A2F24",
+            "letterSpacing": 0.04,
+            "lineHeight": 1.4,
+            "shadow": "none",
+            "shadowColor": ""
+          },
+          "bodyStyle": {
+            "italic": false,
+            "shadow": "none",
+            "shadowColor": "",
+            "font": "sans",
+            "weight": 400,
+            "sizeCm": 6.5,
+            "color": "#5A4C3C",
+            "letterSpacing": 0.01,
+            "lineHeight": 1.75
+          },
+          "panel": {
+            "align": "left",
+            "bg": "light"
+          },
+          "light": {
+            "on": false,
+            "intensity": 1,
+            "temp": "warm"
+          }
+        }
+      ]
+    },
+    {
+      "origin": {
+        "x": 11.05,
+        "z": -37.78
+      },
+      "id": "room-fc1uad",
+      "name": "3. 새 섹션",
+      "intro": "",
+      "introTitleStyle": {
+        "font": "serif",
+        "weight": 700,
+        "sizeCm": 12,
+        "color": "#3A2F24",
+        "letterSpacing": 0.04,
+        "lineHeight": 1.4
+      },
+      "introBodyStyle": {
+        "font": "sans",
+        "weight": 400,
+        "sizeCm": 6.5,
+        "color": "#5A4C3C",
+        "letterSpacing": 0.01,
+        "lineHeight": 1.75
+      },
+      "introPanel": {
+        "align": "left",
+        "bg": "light",
+        "widthCm": 260,
+        "light": {
+          "on": false,
+          "intensity": 1,
+          "temp": "warm"
+        }
+      },
+      "size": {
+        "w": 10.59,
+        "d": 10.84,
+        "h": 4.2
+      },
+      "wall": {
+        "preset": "deep-red",
+        "pattern": true
+      },
+      "floor": {
+        "preset": "walnut-herringbone",
+        "mode": "preset",
+        "color": "#6b4a30",
+        "roughness": "matte"
+      },
+      "ceiling": {
+        "color": "#ece4d6",
+        "lightIntensity": 1,
+        "fixture": "none",
+        "muralMode": "full"
+      },
+      "lighting": {
+        "mood": "warm",
+        "ambient": 0.6
+      },
+      "decor": {
+        "benches": true,
+        "spotlights": true
+      },
+      "exitDoor": {
+        "wall": "north",
+        "offset": 5.29
+      },
+      "artworks": [
+        {
+          "id": "aw-fcszke",
+          "image": "assets/artworks/aw-fcszke.webp",
+          "thumb": "assets/thumbs/aw-fcszke.webp",
+          "file": "JEAN_LOUIS_THÉODORE_GÉRICAULT_-_La_Balsa_de_la_Medusa_(Museo_del_Louvre,_1818-19).jpg",
+          "meta": {
+            "titleKo": "",
+            "titleEn": "JEAN_LOUIS_THÉODORE_GÉRICAULT_-_La_Balsa_de_la_Medusa_(Museo_del_Louvre,_1818-19)",
+            "artistKo": "",
+            "artistEn": "",
+            "year": "",
+            "description": "",
+            "source": "manual",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "JEAN_LOUIS_THÉODORE_GÉRICAULT_-_La_Balsa_de_la_Medusa_(Museo_del_Louvre,_1818-19)",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 410.1,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "west",
+            "x": 3.3,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-fct5mf",
+          "image": "assets/artworks/aw-fct5mf.webp",
+          "thumb": "assets/thumbs/aw-fct5mf.webp",
+          "file": "La_Liberté_guidant_le_peuple_-_Eugène_Delacroix_-_Musée_du_Louvre_Peintures_RF_129_-_après_restauration_2024.jpg",
+          "meta": {
+            "titleKo": "",
+            "titleEn": "La_Liberté_guidant_le_peuple_-_Eugène_Delacroix_-_Musée_du_Louvre_Peintures_RF_129_-_après_restauration_2024",
+            "artistKo": "",
+            "artistEn": "",
+            "year": "",
+            "description": "",
+            "source": "manual",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "La_Liberté_guidant_le_peuple_-_Eugène_Delacroix_-_Musée_du_Louvre_Peintures_RF_129_-_après_restauration_2024",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 350,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "west",
+            "x": 7.84,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-fct9cg",
+          "image": "assets/artworks/aw-fct9cg.webp",
+          "thumb": "assets/thumbs/aw-fct9cg.webp",
+          "file": "David_-_Napoleon_crossing_the_Alps_-_Malmaison1.png",
+          "meta": {
+            "titleKo": "알프스를 넘는 나폴레옹",
+            "titleEn": "Napoleon Crossing the Alps",
+            "artistKo": "자크루이 다비드",
+            "artistEn": "Jacques-Louis David",
+            "year": "1801",
+            "description": "백마를 타고 알프스를 넘는 나폴레옹을 극적으로 이상화한 초상이다. 실제로는 노새를 탔다고 전해지지만, 바람에 휘날리는 망토와 앞발을 든 말로 영웅의 이미지를 완성한 선전 회화의 걸작이다.",
+            "source": "auto",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "알프스를 넘는 나폴레옹",
+            "artist": "자크루이 다비드",
+            "year": "1801",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 233.3,
+            "h": 280
+          },
+          "scale": 0.85,
+          "placement": {
+            "wall": "north",
+            "x": 1.99,
+            "centerHeightCm": 210
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-fctn6h",
+          "image": "assets/artworks/aw-fctn6h.webp",
+          "thumb": "assets/thumbs/aw-fctn6h.webp",
+          "file": "La_grande_odalisque_-_Jean-Auguste_Dominique_Ingres_-_Musée_du_Louvre_Peintures_RF_1158.jpg",
+          "meta": {
+            "titleKo": "그랑드 오달리스크",
+            "titleEn": "La Grande Odalisque",
+            "artistKo": "장오귀스트도미니크 앵그르",
+            "artistEn": "Jean-Auguste-Dominique Ingres",
+            "year": "1814",
+            "description": "터키 궁정의 여인을 등을 보인 채 비스듬히 누운 자세로 그린 작품이다. 해부학적으로 길게 늘인 허리가 논란을 낳았지만, 매끄러운 윤곽선과 이국적 관능미로 앵그르의 대표작이 되었다.",
+            "source": "auto",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "그랑드 오달리스크",
+            "artist": "장오귀스트도미니크 앵그르",
+            "year": "1814",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 502,
+            "h": 280
+          },
+          "scale": 0.65,
+          "placement": {
+            "wall": "north",
+            "x": 8.44,
+            "centerHeightCm": 210
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        },
+        {
+          "id": "aw-fcu2yi",
+          "image": "assets/artworks/aw-fcu2yi.webp",
+          "thumb": "assets/thumbs/aw-fcu2yi.webp",
+          "file": "Le_Serment_des_Horaces_-_Jacques-Louis_David_-_Musée_du_Louvre_Peintures_INV_3692_;_MR_1432.jpg",
+          "meta": {
+            "titleKo": "",
+            "titleEn": "Le_Serment_des_Horaces_-_Jacques-Louis_David_-_Musée_du_Louvre_Peintures_INV_3692_;_MR_1432",
+            "artistKo": "",
+            "artistEn": "",
+            "year": "",
+            "description": "",
+            "source": "manual",
+            "verified": false
+          },
+          "captionStyle": "inherit",
+          "caption": {
+            "title": "Le_Serment_des_Horaces_-_Jacques-Louis_David_-_Musée_du_Louvre_Peintures_INV_3692_;_MR_1432",
+            "artist": "",
+            "year": "",
+            "medium": "",
+            "collection": "",
+            "credit": "Public domain",
+            "sourceUrl": ""
+          },
+          "sizeCm": {
+            "w": 360.9,
+            "h": 280
+          },
+          "scale": 1,
+          "placement": {
+            "wall": "east",
+            "x": 5.42,
+            "centerHeightCm": 175
+          },
+          "frame": {
+            "style": "gold",
+            "matte": false,
+            "matteColor": "#f3ead8"
+          },
+          "light": {
+            "intensity": 1.2,
+            "temp": "warm"
+          }
+        }
+      ],
+      "texts": [
+        {
+          "id": "tx-sec-room-fc1uad",
+          "role": "section",
+          "text": "",
+          "placement": {
+            "wall": "south",
+            "x": 7.89,
+            "centerHeightCm": 160
+          },
+          "widthCm": 260,
+          "style": {
+            "font": "serif",
+            "weight": 700,
+            "italic": false,
+            "sizeCm": 12,
+            "color": "#3A2F24",
+            "letterSpacing": 0.04,
+            "lineHeight": 1.4,
+            "shadow": "none",
+            "shadowColor": ""
+          },
+          "bodyStyle": {
+            "italic": false,
+            "shadow": "none",
+            "shadowColor": "",
+            "font": "sans",
+            "weight": 400,
+            "sizeCm": 6.5,
+            "color": "#5A4C3C",
+            "letterSpacing": 0.01,
+            "lineHeight": 1.75
+          },
+          "panel": {
+            "align": "left",
+            "bg": "light"
+          },
+          "light": {
+            "on": false,
+            "intensity": 1,
+            "temp": "warm"
+          }
+        }
+      ]
+    },
+    {
+      "origin": {
+        "x": 13.55,
+        "z": -46.78
+      },
+      "id": "room-fd4rej",
+      "name": "4. 새 섹션",
+      "intro": "",
+      "introTitleStyle": {
+        "font": "serif",
+        "weight": 700,
+        "sizeCm": 12,
+        "color": "#3A2F24",
+        "letterSpacing": 0.04,
+        "lineHeight": 1.4
+      },
+      "introBodyStyle": {
+        "font": "sans",
+        "weight": 400,
+        "sizeCm": 6.5,
+        "color": "#5A4C3C",
+        "letterSpacing": 0.01,
+        "lineHeight": 1.75
+      },
+      "introPanel": {
+        "align": "left",
+        "bg": "light",
+        "widthCm": 260,
+        "light": {
+          "on": false,
+          "intensity": 1,
+          "temp": "warm"
+        }
+      },
+      "size": {
+        "w": 15.2,
+        "d": 9,
+        "h": 4.2
+      },
+      "wall": {
+        "preset": "deep-red",
+        "pattern": true
+      },
+      "floor": {
+        "preset": "walnut-herringbone",
+        "mode": "preset",
+        "color": "#6b4a30",
+        "roughness": "matte"
+      },
+      "ceiling": {
+        "color": "#ece4d6",
+        "lightIntensity": 0,
+        "fixture": "none",
+        "muralMode": "full"
+      },
+      "lighting": {
+        "mood": "warm",
+        "ambient": 0.6
+      },
+      "decor": {
+        "benches": false,
+        "spotlights": false
+      },
+      "exitDoor": {
+        "wall": "north",
+        "offset": 7.6
+      },
+      "artworks": [],
+      "roomType": "media",
+      "screen": {
+        "source": "upload",
+        "file": "assets/patterns/vid-un5fih.mp4",
+        "videoId": "",
+        "wall": "north",
+        "position": null,
+        "scale": 2,
+        "autoplay": true
+      }
+    },
+    {
+      "origin": {
+        "x": 15.15,
+        "z": -55.78
+      },
+      "id": "room-fl5rik",
+      "name": "5. 새 섹션",
+      "intro": "",
+      "introTitleStyle": {
+        "font": "serif",
+        "weight": 700,
+        "sizeCm": 12,
+        "color": "#3A2F24",
+        "letterSpacing": 0.04,
+        "lineHeight": 1.4
+      },
+      "introBodyStyle": {
+        "font": "sans",
+        "weight": 400,
+        "sizeCm": 6.5,
+        "color": "#5A4C3C",
+        "letterSpacing": 0.01,
+        "lineHeight": 1.75
+      },
+      "introPanel": {
+        "align": "left",
+        "bg": "light",
+        "widthCm": 260,
+        "light": {
+          "on": false,
+          "intensity": 1,
+          "temp": "warm"
+        }
+      },
+      "size": {
+        "w": 12,
+        "d": 9,
+        "h": 4.2
+      },
+      "wall": {
+        "preset": "deep-red",
+        "pattern": true
+      },
+      "floor": {
+        "preset": "walnut-herringbone",
+        "mode": "preset",
+        "color": "#6b4a30",
+        "roughness": "matte"
+      },
+      "ceiling": {
+        "color": "#ece4d6",
+        "lightIntensity": 1,
+        "fixture": "none",
+        "muralMode": "full"
+      },
+      "lighting": {
+        "mood": "warm",
+        "ambient": 0.6
+      },
+      "decor": {
+        "benches": true,
+        "spotlights": true
+      },
+      "exitDoor": null,
+      "artworks": [],
+      "roomType": "finale",
+      "finale": {
+        "preset": "random",
+        "returnTo": "__lobby__",
+        "messages": [
+          "오늘의 전시는 어떠셨나요?",
+          "레닌이 가장 두려워했던 건",
+          "베토벤의 열정 소나타라는 말 아시나요?",
+          "예술은 우리를 감동시키고 움직이는",
+          "가장 강력한 힘 입니다.",
+          "즐거운 하루 보내시기 바랍니다."
+        ],
+        "dwellSec": 4,
+        "showMessages": true
+      }
+    }
+  ],
+  "captionStyle": {
+    "font": "sans",
+    "size": "m",
+    "color": "#33291f",
+    "bg": "light",
+    "bgOpacity": 0.96,
+    "border": false,
+    "lang": "both"
+  }
+}
