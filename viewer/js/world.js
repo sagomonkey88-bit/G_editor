@@ -312,19 +312,40 @@ function buildScreen(group, rect, room, videoUrls = {}) {
   panel.position.set(at.x + nx * (off + 0.012), cy, at.z + nz * (off + 0.012)); panel.rotation.y = rot;
   panel.userData.screen = true;
   group.add(panel);
-  // P3-3: 업로드 영상 → VideoTexture (음소거 자동재생, 무광 = 스크린 자체 발광 느낌)
+  // P3-3: 업로드 영상 → VideoTexture (무광 = 스크린 자체 발광 느낌)
+  // F1(v1.7): 소리와 함께 자동재생 시도 → 브라우저가 차단하면 음소거로 시작하고
+  // 첫 사용자 제스처(클릭/키)에서 소리를 켠다. 볼륨 거리 감쇠는 main.js animate 담당.
   let video = null;
   if (s.source === 'upload' && s.file && videoUrls[s.file]) {
     video = document.createElement('video');
     video.src = videoUrls[s.file];
-    video.loop = true; video.muted = true; video.crossOrigin = 'anonymous';
+    video.loop = true; video.crossOrigin = 'anonymous';
     video.playsInline = true; video.setAttribute('playsinline', ''); video.setAttribute('webkit-playsinline', '');
-    if (s.autoplay !== false) video.play?.().catch(() => {});
+    if (s.autoplay !== false) autoplayWithSound(video);
     const vtex = new THREE.VideoTexture(video);
     vtex.colorSpace = THREE.SRGBColorSpace;
     panel.material.map = vtex; panel.material.color.set('#ffffff'); panel.material.needsUpdate = true;
   }
   return { panel, room, center: { x: at.x, y: cy, z: at.z }, wall, w, h, video };
+}
+
+// F1(v1.7): 소리 포함 자동재생. 차단되면 음소거 재생 후 첫 제스처에서 소리 복구.
+function autoplayWithSound(video) {
+  video.muted = false;
+  const p = video.play?.();
+  if (!p || !p.catch) return;
+  p.catch(() => {
+    video.muted = true;
+    video.play?.().catch(() => {});
+    const unlock = () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+      video.muted = false;
+      video.play?.().catch(() => {});
+    };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+  });
 }
 
 // --- 단방향 문 숨김 쪽 패치 (P1-2) ------------------------------------------

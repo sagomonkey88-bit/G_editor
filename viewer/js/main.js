@@ -406,6 +406,12 @@ async function boot() {
       if (interactions) interactions.update(dt);
       if (seating) seating.update();
       if (finale) finale.update(dt, currentRoomIndex(controls.pos, layout));
+      // F1(v1.7): 스크린 영상 볼륨 거리 감쇠 — 가까울수록 크게, 멀면(다른 방) 무음
+      for (const sc of (world.screens || [])) {
+        if (!sc.video || sc.video.muted) continue;
+        const d = Math.hypot(sc.center.x - controls.pos.x, sc.center.z - controls.pos.y);
+        sc.video.volume = Math.max(0, Math.min(1, 1 - (d - 4) / 12));
+      }
       // 라이트 매니저: 모바일은 현재 룸의 조명만 활성(§5.8)
       if (isMobile && (arts.spots.length || world.moodLights.length)) {
         const ci = currentRoomIndex(controls.pos, layout);

@@ -324,9 +324,9 @@ function renderRoomProps() {
     ${(room.screen.source || 'upload') === 'upload' ? `
     <label class="lib-browse" style="display:block;text-align:center;margin-top:2px;font-size:12px">${room.screen.file ? '영상 교체' : '영상 업로드'} (mp4/webm · 최대 100MB)<input type="file" accept="video/mp4,video/webm" data-screen-video hidden></label>
     ${room.screen.file
-      ? `<div class="hint-note">영상 적용됨 · 자동재생은 음소거로 시작합니다. <button class="tb-btn" data-screen-video-clear style="font-size:11px;padding:2px 8px;margin-left:4px">제거</button></div>`
+      ? `<div class="hint-note">영상 적용됨 · 소리와 함께 자동 재생됩니다 (브라우저가 차단하면 첫 클릭 시 소리가 켜집니다). <button class="tb-btn" data-screen-video-clear style="font-size:11px;padding:2px 8px;margin-left:4px">제거</button></div>`
       : `<div class="hint-note">긴 영상은 GitHub 파일당 100MB 제한 — 초과 시 업로드가 차단됩니다.</div>`}
-    <div class="toggle-row"><label>자동재생 (음소거로 시작)</label><div class="switch ${room.screen.autoplay !== false ? 'on' : ''}" data-screen-autoplay></div></div>` : ''}
+    <div class="toggle-row"><label>자동재생 (소리 포함)</label><div class="switch ${room.screen.autoplay !== false ? 'on' : ''}" data-screen-autoplay></div></div>` : ''}
     <div class="field"><label>스크린 벽</label>
       <div class="seg" data-screen-wall>${PRESETS.wallDir.map(w => `<button data-v="${w}" class="${room.screen.wall === w ? 'on' : ''}">${DIR_KO[w]}</button>`).join('')}</div></div>
     <div class="field"><label>위치 offset (m · 비우면 중앙)</label><input type="number" step="0.1" data-screen-pos value="${room.screen.position ?? ''}"></div>
@@ -685,7 +685,7 @@ async function uploadVideo(file, roomId) {
     await store.addImage(id, file, file); // 이미지 blob 저장소 재사용(썸네일 자리에 원본)
     store.mutate(p => { const r = p.rooms.find(x => x.id === roomId); if (r?.screen) { r.screen.source = 'upload'; r.screen.file = id; } }, { detail: {} });
     renderRoomProps();
-    toast(`영상을 적용했습니다 (${(file.size / 1024 / 1024).toFixed(1)}MB). 자동재생은 음소거로 시작합니다.`);
+    toast(`영상을 적용했습니다 (${(file.size / 1024 / 1024).toFixed(1)}MB). 소리와 함께 자동 재생됩니다.`);
   } catch (err) { toast('영상 업로드 실패: ' + err.message, true); }
 }
 

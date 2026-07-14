@@ -143,7 +143,7 @@ export class Seating {
     const v = this.activeScreen?.video;
     if (v) {
       v.removeEventListener('timeupdate', this._onTime);
-      v.muted = true; // 벽 스크린은 음소거 유지(재생 위치는 동일 요소라 자동 동기화)
+      // F1(v1.7): 벽 스크린도 소리 유지 (재생 위치·음소거 상태는 동일 요소라 자동 동기화)
       if (v.parentElement === this.stage) this.stage.removeChild(v);
     }
     this.player.style.display = 'none';
