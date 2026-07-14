@@ -135,6 +135,16 @@ async function preloadPatterns(project, ctx) {
   return map;
 }
 
+// P3-3: 미디어 룸 업로드 영상 asset id → 재생 URL (blob 프리뷰 / 배포 상대경로)
+function collectVideoUrls(project, ctx) {
+  const urls = {};
+  for (const r of (project.rooms || [])) {
+    const s = r.screen;
+    if (s && s.source === 'upload' && s.file) urls[s.file] = resolveAsset(ctx, s.file);
+  }
+  return urls;
+}
+
 // ---- 조명 ---------------------------------------------------------------
 function setupLights(scene, isMobile) {
   const hemi = new THREE.HemisphereLight(0xfff2dc, 0x3a2f28, 0.55);
@@ -221,7 +231,7 @@ async function boot() {
   setProgress(0.4, '공간을 짓는 중…');
   let patternImages = await preloadPatterns(project, ctx);
   const layout = computeLayout(project);
-  let world = buildWorld(scene, project, layout, patternImages);
+  let world = buildWorld(scene, project, layout, patternImages, collectVideoUrls(project, ctx));
 
   setProgress(0.7, '작품을 거는 중…');
   let arts = buildArtworks(scene, project, layout, ctx, resolveAsset);
@@ -315,11 +325,12 @@ async function boot() {
     normalizeProject(project2);
     project = project2;
     patternImages = await preloadPatterns(project2, ctx);
+    for (const sc of (world.screens || [])) { try { sc.video?.pause(); sc.video && (sc.video.src = ''); } catch (e) { /* 무시 */ } }
     scene.remove(world.group); disposeGroup(world.group);
     scene.remove(arts.group); disposeGroup(arts.group);
     const layout2 = computeLayout(project2);
     Object.assign(layout, layout2); // 참조 유지(컨트롤/오토워크가 같은 객체를 봄)
-    world = buildWorld(scene, project2, layout, patternImages);
+    world = buildWorld(scene, project2, layout, patternImages, collectVideoUrls(project2, ctx));
     arts = buildArtworks(scene, project2, layout, ctx, resolveAsset);
     if (controls) { controls.colliders = world.colliders; controls.oneWayColliders = world.oneWayColliders; }
     if (interactions) { interactions.anchors = arts.anchors; interactions.current = null; }

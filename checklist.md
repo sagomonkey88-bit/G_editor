@@ -171,10 +171,13 @@
 - [x] 참고: 벤치 수동 이동/삭제/추가 UI 는 후속(현재 자동 배치·데이터화는 지원, room.benches 저장 시 우선)
 - [x] 커밋 `feat(v1.6): P3-2 …`
 
-## P3-3. 영상 소스 (업로드)
-- [ ] mp4/webm 업로드 → VideoTexture 스크린 렌더, 100MB 초과 차단 + 용량/유튜브 안내, 음소거 자동재생
-- [ ] 유튜브는 스키마·UI 자리만(후속). 내보내기 ZIP 외부요청 0 유지
-- [ ] 커밋 `feat(v1.6): P3-3 …`
+## P3-3. 영상 소스 (업로드) ✅ (커밋 완료)
+- [x] world.js buildScreen: source='upload'+file → `<video>`(muted/loop/playsinline) + VideoTexture 스크린 렌더. buildWorld(videoUrls) + main.collectVideoUrls(resolveAsset) + rebuild 시 video dispose
+- [x] app.js: 영상 소스 seg(업로드/유튜브 disabled) + 업로드(mp4/webm) 100MB 초과 차단 + 용량/유튜브 안내 + 자동재생 토글. uploadVideo(store.addImage blob 재사용)
+- [x] 자산 배선: screen.file → patternAssetIds(프리뷰 blob맵)·state pack/unpack·exporter packPattern(video ext: webm/mp4, assetExt/assetMime 헬퍼). 내보내기 ZIP 외부요청 0 유지
+- [x] 검증: 업로드→screen.file·patternIds·blob맵 포함·100MB 차단. 뷰어 VideoTexture readyState4·currentTime 진행·재생중, **스크린에 영상 렌더 스크린샷 확인**, 콘솔 클린
+- [x] 유튜브는 소스 seg 자리만(후속)
+- [x] 커밋 `feat(v1.6): P3-3 …`
 
 ## P3-4. 풀스크린 플레이어
 - [ ] 착석 시 "풀스크린으로 보기" 버튼 → 2D 오버레이(재생/일시정지·시크·배속·±10초·처음부터·음량·ESC), 종료 시 벽 스크린 위치 동기화. 모바일 터치 확인

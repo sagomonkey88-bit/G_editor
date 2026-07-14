@@ -22,7 +22,7 @@ const hkey = (z) => `H:${z.toFixed(3)}`;
 const vkey = (x) => `V:${x.toFixed(3)}`;
 
 // patternImages: { [wall.patternAsset|floor.asset]: HTMLImageElement } — main.js 가 사전 로드 (P5)
-export function buildWorld(scene, project, layout, patternImages = {}) {
+export function buildWorld(scene, project, layout, patternImages = {}, videoUrls = {}) {
   const group = new THREE.Group();
   group.name = 'world';
   scene.add(group);
@@ -212,7 +212,7 @@ export function buildWorld(scene, project, layout, patternImages = {}) {
   for (const r of rects) {
     if (r.isLobby || !r.room) continue;
     if ((r.room.roomType || 'gallery') !== 'media' || !r.room.screen) continue;
-    const sc = buildScreen(group, r.rect, r.room);
+    const sc = buildScreen(group, r.rect, r.room, videoUrls);
     if (sc) screens.push({ ...sc, roomId: r.id });
   }
 
@@ -288,7 +288,7 @@ function addBenchAt(group, colliders, a, x, z, yaw) {
 // --- 미디어 룸 스크린 (P3-1) — 벽면 16:9 패널 + 얇은 어두운 프레임 ----------------
 // 반환 { panel(메쉬), room } — 영상 텍스처(P3-3)가 panel.material.map 을 채운다.
 const SCREEN_BASE_W = 3.2; // scale 1 기준 폭(m), 16:9
-function buildScreen(group, rect, room) {
+function buildScreen(group, rect, room, videoUrls = {}) {
   const s = room.screen;
   const wall = s.wall || 'north';
   const wallH = room.size.h;
@@ -312,7 +312,19 @@ function buildScreen(group, rect, room) {
   panel.position.set(at.x + nx * (off + 0.012), cy, at.z + nz * (off + 0.012)); panel.rotation.y = rot;
   panel.userData.screen = true;
   group.add(panel);
-  return { panel, room, center: { x: at.x, y: cy, z: at.z }, wall, w, h };
+  // P3-3: 업로드 영상 → VideoTexture (음소거 자동재생, 무광 = 스크린 자체 발광 느낌)
+  let video = null;
+  if (s.source === 'upload' && s.file && videoUrls[s.file]) {
+    video = document.createElement('video');
+    video.src = videoUrls[s.file];
+    video.loop = true; video.muted = true; video.crossOrigin = 'anonymous';
+    video.playsInline = true; video.setAttribute('playsinline', ''); video.setAttribute('webkit-playsinline', '');
+    if (s.autoplay !== false) video.play?.().catch(() => {});
+    const vtex = new THREE.VideoTexture(video);
+    vtex.colorSpace = THREE.SRGBColorSpace;
+    panel.material.map = vtex; panel.material.color.set('#ffffff'); panel.material.needsUpdate = true;
+  }
+  return { panel, room, center: { x: at.x, y: cy, z: at.z }, wall, w, h, video };
 }
 
 // --- 단방향 문 숨김 쪽 패치 (P1-2) ------------------------------------------

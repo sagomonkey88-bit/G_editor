@@ -300,7 +300,18 @@ function renderRoomProps() {
       </div></div>
     ${roomType === 'media' && room.screen ? `
     <div class="panel-title" style="margin-top:14px">미디어 스크린 (16:9)</div>
-    <div class="hint-note">미디어 룸은 조명이 자동으로 어두워집니다. 영상 업로드는 다음 단계에서 추가됩니다.</div>
+    <div class="hint-note">미디어 룸은 조명이 자동으로 어두워집니다.</div>
+    <div class="field"><label>영상 소스</label>
+      <div class="seg" data-screen-source>
+        <button data-v="upload" class="${(room.screen.source || 'upload') === 'upload' ? 'on' : ''}">직접 업로드</button>
+        <button data-v="youtube" class="${room.screen.source === 'youtube' ? 'on' : ''}" disabled title="다음 업데이트에서 지원">유튜브 (예정)</button>
+      </div></div>
+    ${(room.screen.source || 'upload') === 'upload' ? `
+    <label class="lib-browse" style="display:block;text-align:center;margin-top:2px;font-size:12px">${room.screen.file ? '영상 교체' : '영상 업로드'} (mp4/webm · 최대 100MB)<input type="file" accept="video/mp4,video/webm" data-screen-video hidden></label>
+    ${room.screen.file
+      ? `<div class="hint-note">영상 적용됨 · 자동재생은 음소거로 시작합니다. <button class="tb-btn" data-screen-video-clear style="font-size:11px;padding:2px 8px;margin-left:4px">제거</button></div>`
+      : `<div class="hint-note">긴 영상은 GitHub 파일당 100MB 제한 — 초과 시 업로드가 차단됩니다.</div>`}
+    <div class="toggle-row"><label>자동재생 (음소거로 시작)</label><div class="switch ${room.screen.autoplay !== false ? 'on' : ''}" data-screen-autoplay></div></div>` : ''}
     <div class="field"><label>스크린 벽</label>
       <div class="seg" data-screen-wall>${PRESETS.wallDir.map(w => `<button data-v="${w}" class="${room.screen.wall === w ? 'on' : ''}">${DIR_KO[w]}</button>`).join('')}</div></div>
     <div class="field"><label>위치 offset (m · 비우면 중앙)</label><input type="number" step="0.1" data-screen-pos value="${room.screen.position ?? ''}"></div>
@@ -443,6 +454,10 @@ function renderRoomProps() {
     }, { silent: false });
     renderRoomProps(); renderAtmosphere();
   });
+  root.querySelector('[data-screen-source]')?.addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) { upd(r => { if (r.screen) r.screen.source = b.dataset.v; }, { silent: false }); renderRoomProps(); } });
+  root.querySelector('[data-screen-video]')?.addEventListener('change', e => uploadVideo(e.target.files[0], room.id));
+  root.querySelector('[data-screen-video-clear]')?.addEventListener('click', () => { upd(r => { if (r.screen) r.screen.file = ''; }, { silent: false }); renderRoomProps(); });
+  root.querySelector('[data-screen-autoplay]')?.addEventListener('click', () => { upd(r => { if (r.screen) r.screen.autoplay = r.screen.autoplay === false; }, { silent: false }); renderRoomProps(); });
   root.querySelector('[data-screen-wall]')?.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { upd(r => { if (r.screen) r.screen.wall = b.dataset.v; }, { silent: false }); renderRoomProps(); } });
   root.querySelector('[data-screen-pos]')?.addEventListener('input', e => upd(r => { if (r.screen) { const v = parseFloat(e.target.value); r.screen.position = isFinite(v) ? v : null; } }, { coalesce: `screen.pos:${room.id}` }));
   root.querySelector('[data-screen-scale]')?.addEventListener('input', e => { upd(r => { if (r.screen) r.screen.scale = parseFloat(e.target.value); }, { coalesce: `screen.scale:${room.id}` }); const l = root.querySelector('.screen-scale-lbl'); if (l) l.textContent = parseFloat(e.target.value).toFixed(2); });
@@ -630,6 +645,23 @@ function renderAtmosphere() {
     toast('모든 공간 천장에 일괄 적용했습니다.');
     renderAtmosphere();
   });
+}
+
+// P3-3(v1.6): 미디어 룸 영상 업로드 — mp4/webm, 100MB 초과 차단, IndexedDB blob 저장.
+async function uploadVideo(file, roomId) {
+  if (!file) return;
+  const MAX = 100 * 1024 * 1024;
+  if (file.size > MAX) {
+    toast(`영상이 ${(file.size / 1024 / 1024).toFixed(0)}MB — 파일당 100MB 제한을 초과합니다. 긴 영상은 유튜브(예정)를 권장합니다.`, true);
+    return;
+  }
+  try {
+    const id = 'vid-' + Math.random().toString(36).slice(2, 8);
+    await store.addImage(id, file, file); // 이미지 blob 저장소 재사용(썸네일 자리에 원본)
+    store.mutate(p => { const r = p.rooms.find(x => x.id === roomId); if (r?.screen) { r.screen.source = 'upload'; r.screen.file = id; } }, { detail: {} });
+    renderRoomProps();
+    toast(`영상을 적용했습니다 (${(file.size / 1024 / 1024).toFixed(1)}MB). 자동재생은 음소거로 시작합니다.`);
+  } catch (err) { toast('영상 업로드 실패: ' + err.message, true); }
 }
 
 // 커스텀 패턴 업로드 (P5): 1024px WebP 최적화 → IndexedDB → wall/floor 필드 연결

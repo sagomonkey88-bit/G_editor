@@ -4,6 +4,22 @@ import { makeProject, makeRoom, makeArtwork, validateProject, ensureLobby, ensur
 import { resolvePlacement, EYE_LEVEL_CM } from '../../shared/placementRules.js';
 import { computeRoomPlan, applyRoomPlan, ensureSectionText } from './autoLayout.js'; // v1.5 보완 B1/B2
 
+// P3-3(v1.6): 자산 확장자/MIME — 이미지 + 미디어 영상(webm/mp4) 공용 pack/unpack.
+function assetExt(type = '') {
+  if (type.includes('webm')) return 'webm';
+  if (type.includes('mp4')) return 'mp4';
+  if (type.includes('webp')) return 'webp';
+  if (type.includes('png')) return 'png';
+  return 'jpg';
+}
+function assetMime(path = '') {
+  if (path.endsWith('webm')) return 'video/webm';
+  if (path.endsWith('mp4')) return 'video/mp4';
+  if (path.endsWith('webp')) return 'image/webp';
+  if (path.endsWith('png')) return 'image/png';
+  return 'image/jpeg';
+}
+
 const DB_NAME = 'museum-maker';
 const DB_VER = 1;
 const STORE_KV = 'kv';
@@ -278,6 +294,7 @@ export class ProjectStore extends EventTarget {
       if (r?.wall?.patternAsset) ids.add(r.wall.patternAsset);
       if (r?.floor?.asset) ids.add(r.floor.asset);
       if (r?.ceiling?.muralImage) ids.add(r.ceiling.muralImage); // P2(v1.6) 천장화
+      if (r?.screen?.source === 'upload' && r.screen.file) ids.add(r.screen.file); // P3-3(v1.6) 미디어 영상
       for (const f of Object.values(r?.wallFaces || {})) if (f?.patternAsset) ids.add(f.patternAsset); // P3
     };
     for (const r of this.project.rooms) scan(r);
@@ -310,12 +327,12 @@ export class ProjectStore extends EventTarget {
       if (!id || String(id).startsWith('assets/')) return;
       const im = this.images.get(id);
       if (!im) return;
-      const ext = im.blob.type.includes('webp') ? 'webp' : (im.blob.type.includes('png') ? 'png' : 'jpg');
+      const ext = assetExt(im.blob.type);
       holder[field] = `assets/patterns/${id}.${ext}`;
       zip.file(holder[field], im.blob);
     };
     const packFaces = (r) => { for (const f of Object.values(r?.wallFaces || {})) packPattern(f, 'patternAsset'); }; // P3
-    for (const r of proj.rooms) { packPattern(r.wall, 'patternAsset'); packPattern(r.floor, 'asset'); packPattern(r.ceiling, 'muralImage'); packFaces(r); }
+    for (const r of proj.rooms) { packPattern(r.wall, 'patternAsset'); packPattern(r.floor, 'asset'); packPattern(r.ceiling, 'muralImage'); packPattern(r.screen, 'file'); packFaces(r); }
     if (proj.lobby) { packPattern(proj.lobby.wall, 'patternAsset'); packPattern(proj.lobby.floor, 'asset'); packPattern(proj.lobby.ceiling, 'muralImage'); packFaces(proj.lobby); }
     zip.file('museum.json', JSON.stringify(proj, null, 2));
     zip.file('_projectfile.txt', '이 zip 은 미술관 메이커의 "작업 파일"입니다. Publish 배포본과 다릅니다.\n에디터에서 [프로젝트 불러오기]로 다시 열 수 있습니다.');
@@ -350,12 +367,12 @@ export class ProjectStore extends EventTarget {
       const blob = await f.async('blob');
       const fname = path.split('/').pop();
       const id = fname.replace(/\.[^.]+$/, '');
-      const type = path.endsWith('webp') ? 'image/webp' : path.endsWith('png') ? 'image/png' : 'image/jpeg';
+      const type = assetMime(path);
       newImages.set(id, { blob: blob.slice(0, blob.size, type), thumbBlob: blob.slice(0, blob.size, type) });
       holder[field] = id;
     };
     const unpackFaces = async (r) => { for (const f of Object.values(r?.wallFaces || {})) await unpackPattern(f, 'patternAsset'); }; // P3
-    for (const r of project.rooms) { await unpackPattern(r.wall, 'patternAsset'); await unpackPattern(r.floor, 'asset'); await unpackPattern(r.ceiling, 'muralImage'); await unpackFaces(r); }
+    for (const r of project.rooms) { await unpackPattern(r.wall, 'patternAsset'); await unpackPattern(r.floor, 'asset'); await unpackPattern(r.ceiling, 'muralImage'); await unpackPattern(r.screen, 'file'); await unpackFaces(r); }
     if (project.lobby) { await unpackPattern(project.lobby.wall, 'patternAsset'); await unpackPattern(project.lobby.floor, 'asset'); await unpackPattern(project.lobby.ceiling, 'muralImage'); await unpackFaces(project.lobby); }
     // 기존 이미지 정리
     for (const [id, im] of this.images) { URL.revokeObjectURL(im.url); URL.revokeObjectURL(im.thumbUrl); await idbDel(this.db, STORE_IMG, id); }

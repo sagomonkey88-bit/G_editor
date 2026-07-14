@@ -56,13 +56,15 @@ export async function exportPublishZip(store, opts = {}) {
     if (!id || String(id).startsWith('assets/')) return;
     const im = store.images.get(id);
     if (!im) return;
-    const ext = im.blob.type.includes('webp') ? 'webp' : im.blob.type.includes('png') ? 'png' : 'jpg';
+    const ty = im.blob.type;
+    const ext = ty.includes('webm') ? 'webm' : ty.includes('mp4') ? 'mp4'
+      : ty.includes('webp') ? 'webp' : ty.includes('png') ? 'png' : 'jpg';
     const path = `assets/patterns/${id}.${ext}`;
     holder[field] = path;
     base.file(`data/${path}`, im.blob);
   };
   const packFaces = (r) => { for (const f of Object.values(r?.wallFaces || {})) packPattern(f, 'patternAsset'); }; // P3
-  for (const r of proj.rooms) { packPattern(r.wall, 'patternAsset'); packPattern(r.floor, 'asset'); packPattern(r.ceiling, 'muralImage'); packFaces(r); }
+  for (const r of proj.rooms) { packPattern(r.wall, 'patternAsset'); packPattern(r.floor, 'asset'); packPattern(r.ceiling, 'muralImage'); packPattern(r.screen, 'file'); packFaces(r); }
   if (proj.lobby) { packPattern(proj.lobby.wall, 'patternAsset'); packPattern(proj.lobby.floor, 'asset'); packPattern(proj.lobby.ceiling, 'muralImage'); packFaces(proj.lobby); }
 
   base.file('data/museum.json', JSON.stringify(proj, null, 2));
