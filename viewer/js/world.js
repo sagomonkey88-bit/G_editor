@@ -17,6 +17,14 @@ const WALL_TILE = 2.6;   // 벽지 타일 크기(m)
 const FLOOR_TILE = 1.15; // 바닥 타일 크기(m)
 const MOOD_COLOR = { warm: 0xffd9a8, neutral: 0xfff4e6, cool: 0xdfe9ff };
 
+// F2(v1.7): lightIntensity(0~2) → 방 표면 감쇠 팩터.
+// 전역 조명(hemi/amb/key)은 방별로 끌 수 없으므로, 벽·바닥·천장 머티리얼 색을
+// 낮춰 "방 전체가 어두워지는" 효과를 낸다. 1.0 이상 = 감쇠 없음(포인트라이트가 밝기 담당).
+function roomDim(cst) {
+  const li = cst?.lightIntensity ?? 1;
+  return Math.max(0.16, Math.min(1, 0.2 + 0.8 * li));
+}
+
 // 라인 키: 방향 + 고정좌표(소수 3자리)
 const hkey = (z) => `H:${z.toFixed(3)}`;
 const vkey = (x) => `V:${x.toFixed(3)}`;
@@ -50,6 +58,7 @@ export function buildWorld(scene, project, layout, patternImages = {}, videoUrls
     const { rect } = r;
     const w = rect.xMax - rect.xMin, d = rect.zMax - rect.zMin, h = r.size.h;
     const cx = (rect.xMin + rect.xMax) / 2, cz = (rect.zMin + rect.zMax) / 2;
+    const dim = roomDim(r.ceiling); // F2: 방 전체 밝기
 
     const fs = floorStyleTexture(r.floor, patternImages[r.floor?.asset]);
     const ftex = fs.tex.clone();
@@ -58,7 +67,7 @@ export function buildWorld(scene, project, layout, patternImages = {}, videoUrls
     // P1(v1.4): 무광/유광 — 유광은 낮은 roughness 로 조명 하이라이트의 은은한 반사감
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(w, d),
-      new THREE.MeshStandardMaterial({ map: ftex, roughness: r.floor?.roughness === 'gloss' ? 0.30 : 0.82, metalness: 0.0 })
+      new THREE.MeshStandardMaterial({ map: ftex, color: new THREE.Color(dim, dim, dim), roughness: r.floor?.roughness === 'gloss' ? 0.30 : 0.82, metalness: 0.0 })
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(cx, 0, cz);
@@ -67,11 +76,11 @@ export function buildWorld(scene, project, layout, patternImages = {}, videoUrls
 
     // P2: 천장 색 + 천장화(전체/중앙 패널)
     const cst = r.ceiling || {};
-    const ceilMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(cst.color || '#ece4d6'), roughness: 1.0, metalness: 0 });
+    const ceilMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(cst.color || '#ece4d6').multiplyScalar(dim), roughness: 1.0, metalness: 0 });
     const muralImg = cst.muralImage ? patternImages[cst.muralImage] : null;
     if (muralImg && cst.muralMode !== 'center') {
       const tex = new THREE.Texture(muralImg); tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true;
-      ceilMat.map = tex; ceilMat.color.set('#ffffff');
+      ceilMat.map = tex; ceilMat.color.setScalar(dim);
     }
     const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w, d), ceilMat);
     ceil.rotation.x = Math.PI / 2;
@@ -81,7 +90,7 @@ export function buildWorld(scene, project, layout, patternImages = {}, videoUrls
       const pw = Math.min(w, d) * 0.6;
       const tex = new THREE.Texture(muralImg); tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true;
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(pw, pw),
-        new THREE.MeshStandardMaterial({ map: tex, roughness: 1.0, metalness: 0 }));
+        new THREE.MeshStandardMaterial({ map: tex, color: new THREE.Color(dim, dim, dim), roughness: 1.0, metalness: 0 }));
       panel.rotation.x = Math.PI / 2;
       panel.position.set(cx, h - 0.02, cz);
       group.add(panel);
@@ -148,14 +157,27 @@ export function buildWorld(scene, project, layout, patternImages = {}, videoUrls
   }
 
   // ---- 벽 생성 ----
-  const baseboardMat = new THREE.MeshStandardMaterial({ color: 0x2c2622, roughness: 0.7 });
-  const moldingMat = new THREE.MeshStandardMaterial({ color: 0xe9e0d0, roughness: 0.9 });
+  // F2(v1.7): 걸레받이/몰딩도 방 밝기에 따라 감쇠 — dim 값별 머티리얼 캐시
+  const trimCache = new Map();
+  const trimMats = (dim) => {
+    const k = dim.toFixed(2);
+    if (!trimCache.has(k)) trimCache.set(k, {
+      base: new THREE.MeshStandardMaterial({ color: new THREE.Color(0x2c2622).multiplyScalar(dim), roughness: 0.7 }),
+      mold: new THREE.MeshStandardMaterial({ color: new THREE.Color(0xe9e0d0).multiplyScalar(dim), roughness: 0.9 }),
+    });
+    return trimCache.get(k);
+  };
 
   // 면 스타일 → 텍스처 (wallStyleTexture 내부 캐시 사용). claim 없음(외벽) = null.
   const faceWS = (claim) => {
     if (!claim) return null;
     const def = wallFaceStyle(claim.space, claim.dir);
     return wallStyleTexture(def, patternImages[def?.patternAsset]);
+  };
+  // F2: claim 소속 공간의 밝기 감쇠 (외벽은 반대면 공간 기준)
+  const faceDim = (claim, other) => {
+    const c = claim || other;
+    return c ? roomDim(c.space.ceiling) : 1;
   };
   // 위치 t 에서 라인 양쪽 claim 탐색. posSide: H='S'(+z 면), V='E'(+x 면).
   const claimsAt = (L, t) => {
@@ -190,7 +212,7 @@ export function buildWorld(scene, project, layout, patternImages = {}, videoUrls
           const { pos, neg } = claimsAt(L, (a + b) / 2);
           const wsPos = faceWS(pos) || faceWS(neg);   // 외벽 바깥면(exterior)은 반대면 스타일로 렌더
           const wsNeg = faceWS(neg) || faceWS(pos);
-          buildWallBox(group, colliders, L.axis, L.fixed, a, b, L.height, wsPos, wsNeg, baseboardMat, moldingMat);
+          buildWallBox(group, colliders, L.axis, L.fixed, a, b, L.height, wsPos, wsNeg, faceDim(pos, neg), faceDim(neg, pos), trimMats);
         }
       }
       // 문 상인방(lintel) — 문 중앙 기준 양면 스타일
@@ -198,7 +220,7 @@ export function buildWorld(scene, project, layout, patternImages = {}, videoUrls
         const { pos, neg } = claimsAt(L, (o[0] + o[1]) / 2);
         const wsPos = faceWS(pos) || faceWS(neg);
         const wsNeg = faceWS(neg) || faceWS(pos);
-        buildLintel(group, L.axis, L.fixed, o[0], o[1], o[2], L.height, wsPos, wsNeg, o[3]);
+        buildLintel(group, L.axis, L.fixed, o[0], o[1], o[2], L.height, wsPos, wsNeg, o[3], faceDim(pos, neg), faceDim(neg, pos));
       }
     }
   }
@@ -366,11 +388,13 @@ function buildOneWayPatch(group, oneWayColliders, project, layout, ow, patternIm
 
   // 숨김 쪽 벽 스타일: displayDir 'a'(숨김=건너편)면 이웃 면 스타일, 'b'(숨김=이 방)면 이 방 면 스타일
   let styleDef = wallFaceStyle(room, door.wall);
+  let dimSpace = room; // F2: 숨김 쪽 공간의 밝기 감쇠 적용
   if (door.displayDir === 'a') {
     const opp = findOppositeFace(project, room.id, door.wall, layout);
     const space = opp ? (opp.roomId === '__lobby__' ? project.lobby : project.rooms.find(r => r.id === opp.roomId)) : null;
-    if (space) styleDef = wallFaceStyle(space, opp.wall);
+    if (space) { styleDef = wallFaceStyle(space, opp.wall); dimSpace = space; }
   }
+  const dim = roomDim(dimSpace.ceiling);
   const ws = wallStyleTexture(styleDef, patternImages[styleDef?.patternAsset]);
 
   const yRotFor = (sign) => horiz ? (sign > 0 ? 0 : Math.PI) : (sign > 0 ? Math.PI / 2 : -Math.PI / 2);
@@ -382,6 +406,7 @@ function buildOneWayPatch(group, oneWayColliders, project, layout, ow, patternIm
   };
   // 벽 패널 (개구부 전체 높이 덮음). 숨김 쪽 벽면과 거의 flush + 상인방 앞에 두어 이음매 없이 벽처럼.
   const panelMat = wallFaceMat(ws, LAYOUT.DOOR_W, wallH);
+  panelMat.color.multiplyScalar(dim);
   panelMat.side = THREE.FrontSide;
   const panel = new THREE.Mesh(new THREE.PlaneGeometry(LAYOUT.DOOR_W, wallH), panelMat);
   panel.position.y = wallH / 2;
@@ -389,7 +414,7 @@ function buildOneWayPatch(group, oneWayColliders, project, layout, ow, patternIm
   // 걸레받이 + 상단 몰딩 (숨김 쪽 이음매 연속 — buildWallBox 와 동일 색/치수)
   const strip = (h, y, col, rough) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(LAYOUT.DOOR_W + 0.02, h),
-      new THREE.MeshStandardMaterial({ color: col, roughness: rough, side: THREE.FrontSide }));
+      new THREE.MeshStandardMaterial({ color: new THREE.Color(col).multiplyScalar(dim), roughness: rough, side: THREE.FrontSide }));
     m.position.y = y;
     placeStrip(m, T / 2 + 0.012);
   };
@@ -436,10 +461,12 @@ function wallFaceMat(ws, len, height) {
 // BoxGeometry 재질 순서 [+x, -x, +y, -y, +z, -z].
 // H 벽: +z 면 = 라인 남쪽 공간이 보는 면(wsPos), -z 면 = 북쪽 공간 면(wsNeg).
 // V 벽: +x 면 = 동쪽 공간 면(wsPos), -x 면 = 서쪽 공간 면(wsNeg).
-function buildWallBox(group, colliders, axis, fixed, s, e, height, wsPos, wsNeg, baseboardMat, moldingMat) {
+function buildWallBox(group, colliders, axis, fixed, s, e, height, wsPos, wsNeg, dimPos = 1, dimNeg = 1, trimMats = null) {
   const len = e - s;
   const mPos = wallFaceMat(wsPos, len, height);
-  const mNeg = wsNeg === wsPos ? mPos : wallFaceMat(wsNeg, len, height);
+  mPos.color.multiplyScalar(dimPos); // F2: 방 밝기 감쇠
+  const mNeg = (wsNeg === wsPos && dimNeg === dimPos) ? mPos : wallFaceMat(wsNeg, len, height);
+  if (mNeg !== mPos) mNeg.color.multiplyScalar(dimNeg);
   const mCap = mPos; // 단면(문설주)·상하부는 pos 면 스타일
   const mat = axis === 'H'
     ? [mCap, mCap, mCap, mCap, mPos, mNeg]
@@ -454,12 +481,15 @@ function buildWallBox(group, colliders, axis, fixed, s, e, height, wsPos, wsNeg,
   mesh.castShadow = true; mesh.receiveShadow = true;
   group.add(mesh);
 
-  // 걸레받이
-  const bb = new THREE.Mesh(new THREE.BoxGeometry(sx + 0.02, 0.14, sz + 0.02), baseboardMat);
+  // 걸레받이 + 상단 몰딩 (양면 중 밝은 쪽 기준 감쇠)
+  const tm = trimMats ? trimMats(Math.max(dimPos, dimNeg)) : {
+    base: new THREE.MeshStandardMaterial({ color: 0x2c2622, roughness: 0.7 }),
+    mold: new THREE.MeshStandardMaterial({ color: 0xe9e0d0, roughness: 0.9 }),
+  };
+  const bb = new THREE.Mesh(new THREE.BoxGeometry(sx + 0.02, 0.14, sz + 0.02), tm.base);
   bb.position.set(px, 0.07, pz);
   group.add(bb);
-  // 상단 몰딩
-  const ml = new THREE.Mesh(new THREE.BoxGeometry(sx + 0.02, 0.10, sz + 0.02), moldingMat);
+  const ml = new THREE.Mesh(new THREE.BoxGeometry(sx + 0.02, 0.10, sz + 0.02), tm.mold);
   ml.position.set(px, height - 0.05, pz);
   group.add(ml);
 
@@ -469,12 +499,14 @@ function buildWallBox(group, colliders, axis, fixed, s, e, height, wsPos, wsNeg,
 }
 
 // --- 문 위 상인방 (P3: 양면 재질 분리) ---------------------------------------
-function buildLintel(group, axis, fixed, o0, o1, doorH, wallH, wsPos, wsNeg, oneWay = false) {
+function buildLintel(group, axis, fixed, o0, o1, doorH, wallH, wsPos, wsNeg, oneWay = false, dimPos = 1, dimNeg = 1) {
   const len = o1 - o0;
   const h = wallH - doorH;
   if (h <= 0.01) return;
   const mPos = wallFaceMat(wsPos, len, h);
-  const mNeg = wsNeg === wsPos ? mPos : wallFaceMat(wsNeg, len, h);
+  mPos.color.multiplyScalar(dimPos); // F2: 방 밝기 감쇠
+  const mNeg = (wsNeg === wsPos && dimNeg === dimPos) ? mPos : wallFaceMat(wsNeg, len, h);
+  if (mNeg !== mPos) mNeg.color.multiplyScalar(dimNeg);
   const mat = axis === 'H'
     ? [mPos, mPos, mPos, mPos, mPos, mNeg]
     : [mPos, mNeg, mPos, mPos, mPos, mPos];

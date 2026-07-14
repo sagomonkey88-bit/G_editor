@@ -315,7 +315,9 @@ function renderRoomProps() {
     <div class="field"><label>줄당 유지 시간 (초)</label><input type="number" step="0.5" min="1" max="15" data-fin-dwell value="${room.finale.dwellSec ?? 4}"></div>` : ''}` : ''}
     ${roomType === 'media' && room.screen ? `
     <div class="panel-title" style="margin-top:14px">미디어 스크린 (16:9)</div>
-    <div class="hint-note">미디어 룸은 조명이 자동으로 어두워집니다.</div>
+    <div class="hint-note">미디어 룸은 조명이 자동으로 어두워집니다. 아래에서 밝기를 따로 조절할 수 있습니다.</div>
+    <div class="field"><label>미디어 룸 밝기 <b class="media-light-lbl">${Math.round((room.ceiling?.lightIntensity ?? 0.3) * 100)}%</b></label>
+      <input type="range" data-media-light min="0" max="1.5" step="0.05" value="${room.ceiling?.lightIntensity ?? 0.3}"></div>
     <div class="field"><label>영상 소스</label>
       <div class="seg" data-screen-source>
         <button data-v="upload" class="${(room.screen.source || 'upload') === 'upload' ? 'on' : ''}">직접 업로드</button>
@@ -486,6 +488,8 @@ function renderRoomProps() {
   root.querySelector('[data-screen-wall]')?.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { upd(r => { if (r.screen) r.screen.wall = b.dataset.v; }, { silent: false }); renderRoomProps(); } });
   root.querySelector('[data-screen-pos]')?.addEventListener('input', e => upd(r => { if (r.screen) { const v = parseFloat(e.target.value); r.screen.position = isFinite(v) ? v : null; } }, { coalesce: `screen.pos:${room.id}` }));
   root.querySelector('[data-screen-scale]')?.addEventListener('input', e => { upd(r => { if (r.screen) r.screen.scale = parseFloat(e.target.value); }, { coalesce: `screen.scale:${room.id}` }); const l = root.querySelector('.screen-scale-lbl'); if (l) l.textContent = parseFloat(e.target.value).toFixed(2); });
+  // F3(v1.7): 미디어 룸 전용 밝기 — ceiling.lightIntensity(범용 방 조명) 공유
+  root.querySelector('[data-media-light]')?.addEventListener('input', e => { const v = parseFloat(e.target.value); upd(r => { r.ceiling = r.ceiling || {}; r.ceiling.lightIntensity = v; }, { coalesce: `medialight:${room.id}` }); const l = root.querySelector('.media-light-lbl'); if (l) l.textContent = Math.round(v * 100) + '%'; });
   const ew = root.querySelector('[data-exit-wall]');
   if (ew) ew.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; upd(r => { r.exitDoor = r.exitDoor || { offset: 3 }; r.exitDoor.wall = b.dataset.v; }, { silent: false }); renderRoomProps(); });
   const eo = root.querySelector('[data-exit-offset]');
@@ -580,7 +584,7 @@ function renderAtmosphere() {
       </div>
       <div class="swatches" style="margin-top:8px">${Object.entries(CEIL_SWATCH).map(([k, c]) =>
         `<div class="swatch ${C.color === c ? 'on' : ''}" data-ceil-quick="${c}" style="background:${c}"><span>${CEIL_LABELS[k]}</span></div>`).join('')}</div>
-      <div class="field" style="margin-top:8px"><label>밝기 ${Math.round((C.lightIntensity ?? 1) * 100)}% (방 조명)</label>
+      <div class="field" style="margin-top:8px"><label>방 전체 밝기 ${Math.round((C.lightIntensity ?? 1) * 100)}% (벽·바닥·천장·조명)</label>
         <input type="range" data-ceil-light min="0" max="2" step="0.05" value="${C.lightIntensity ?? 1}"></div>
       <div class="field"><label>조명 소품</label>
         <select data-ceil-fixture style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:7px">
