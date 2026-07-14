@@ -265,7 +265,7 @@ async function boot() {
       spawnX: layout.spawn.x, spawnZ, oneWayColliders: world.oneWayColliders,
     });
     interactions = new Interactions(controls, arts.anchors, document.getElementById('hud'));
-    seating = new Seating(controls, world.benchAnchors, document.getElementById('hud')); // P3-2 미디어 룸 착석
+    seating = new Seating(controls, world.benchAnchors, world.screens, document.getElementById('hud')); // P3-2/P3-4 미디어 룸 착석·플레이어
     window.__museum.seating = seating;
     hud?.attachControls(controls);
     const dwell = parseFloat(params.get('dwell')) || 4;
@@ -334,7 +334,7 @@ async function boot() {
     arts = buildArtworks(scene, project2, layout, ctx, resolveAsset);
     if (controls) { controls.colliders = world.colliders; controls.oneWayColliders = world.oneWayColliders; }
     if (interactions) { interactions.anchors = arts.anchors; interactions.current = null; }
-    if (seating) { if (controls?.seated) controls.stand(); seating.anchors = world.benchAnchors; seating.near = null; }
+    if (seating) { if (seating.playerOpen) seating.closePlayer(); if (controls?.seated) controls.stand(); seating.anchors = world.benchAnchors; seating.screens = world.screens; seating.activeScreen = null; seating.near = null; seating.fsBtn.style.display = 'none'; }
     if (autowalk) {
       autowalk.stop?.();
       autowalk.anchors = arts.anchors;
