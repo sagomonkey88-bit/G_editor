@@ -428,14 +428,26 @@ export function generateBenches(room, rect) {
 }
 
 // P4(v1.6): 피날레 룸 설정 — 절차 프리셋·복귀 지점·마무리 메시지.
-export const FINALE_PRESETS = Object.freeze(['random', 'space', 'seasea', 'garden']);
+// F8(v1.7): 'ocean'(바다속) 프리셋 추가. F10: msgStyle(메시지 폰트/크기/색/위치).
+export const FINALE_PRESETS = Object.freeze(['random', 'space', 'seasea', 'ocean', 'garden']);
+export const FINALE_MSG_SIZES = Object.freeze(['s', 'm', 'l']);
+export const FINALE_MSG_POS = Object.freeze(['top', 'center', 'bottom']);
+export function makeFinaleMsgStyle(overrides = {}) {
+  return {
+    font: TEXT_FONTS.includes(overrides.font) ? overrides.font : 'pretendard',
+    size: FINALE_MSG_SIZES.includes(overrides.size) ? overrides.size : 'm',
+    color: (typeof overrides.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(overrides.color)) ? overrides.color : '#ffffff',
+    pos: FINALE_MSG_POS.includes(overrides.pos) ? overrides.pos : 'center',
+  };
+}
 export function makeFinale(overrides = {}) {
   return {
-    preset: FINALE_PRESETS.includes(overrides.preset) ? overrides.preset : 'random', // random=진입마다 랜덤
+    preset: FINALE_PRESETS.includes(overrides.preset) ? overrides.preset : 'random', // random=진입마다 순환(F9)
     returnTo: overrides.returnTo || '__lobby__', // 복귀 지점: '__lobby__' | roomId
     messages: Array.isArray(overrides.messages) ? overrides.messages.filter(s => typeof s === 'string') : [],
     dwellSec: typeof overrides.dwellSec === 'number' ? overrides.dwellSec : 4, // 메시지 줄당 유지 시간(초)
     showMessages: overrides.showMessages !== false,
+    msgStyle: makeFinaleMsgStyle(overrides.msgStyle),
   };
 }
 

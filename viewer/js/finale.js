@@ -88,9 +88,19 @@ export class Finale {
   }
 
   // ---- P4-4 마무리 메시지 ----
+  // F10(v1.7): 메시지 스타일(폰트/크기/색/위치) 적용 — 에디터 finale.msgStyle
+  _applyMsgStyle(fin) {
+    const st = fin.msgStyle || {};
+    this.msgEl.style.fontFamily = MSG_FONTS[st.font] || MSG_FONTS.pretendard;
+    this.msgEl.style.fontSize = (MSG_SIZES[st.size] || MSG_SIZES.m) + 'px';
+    this.msgEl.style.color = st.color || '#ffffff';
+    this.msgEl.style.top = MSG_POS[st.pos] || MSG_POS.center;
+  }
+
   _startMessages(fin) {
     this.endBtn.style.display = 'none';
     this.msgEl.style.opacity = '0';
+    this._applyMsgStyle(fin);
     if (!fin.showMessages || !(fin.messages || []).length) {
       this._msgTimer = setTimeout(() => { this.endBtn.style.display = 'block'; }, 2600);
       return;
@@ -112,11 +122,29 @@ export class Finale {
   _stopMessages() { clearTimeout(this._msgTimer); this.msgEl.style.opacity = '0'; }
 }
 
+// F10(v1.7): 메시지 스타일 상수 (에디터 finale.msgStyle 값 → CSS)
+const MSG_FONTS = {
+  pretendard: 'Pretendard,sans-serif',
+  serif: "'Noto Serif KR',serif",
+  sans: 'Pretendard,sans-serif',
+  'noto-sans': "'Noto Sans KR',sans-serif",
+};
+const MSG_SIZES = { s: 22, m: 30, l: 42 };
+const MSG_POS = { top: '16%', center: '36%', bottom: '62%' };
+
 // ---- 프리셋 선택 ----
+// F9(v1.7): '랜덤'은 방문마다 순환 — 지난 방문과 다른 프리셋을 차례로 보여줘
+// 재방문 관객이 매번 새로운 공간을 만나게 한다. (localStorage 불가 환경은 순수 랜덤)
 function pickPreset(p) {
   if (p && p !== 'random' && PRESETS[p]) return p;
   const keys = Object.keys(PRESETS);
-  return keys[Math.floor(Math.random() * keys.length)];
+  let idx = Math.floor(Math.random() * keys.length);
+  try {
+    const prev = parseInt(localStorage.getItem('museum-finale-rot'), 10);
+    if (isFinite(prev)) idx = (prev + 1) % keys.length;
+    localStorage.setItem('museum-finale-rot', String(idx));
+  } catch (e) { /* 폴백: 순수 랜덤 */ }
+  return keys[idx];
 }
 
 // ---- 공용 헬퍼 ----
@@ -145,6 +173,14 @@ function softTexture(inner) {
   g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
   return new THREE.CanvasTexture(c);
 }
+// F8(v1.7): 세로 그라디언트 (위 밝음 → 아래 투명) — 바다속 빛줄기용
+function vGradientTexture(top) {
+  const c = document.createElement('canvas'); c.width = 16; c.height = 128; const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 0, 128);
+  grd.addColorStop(0, top); grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 16, 128);
+  return new THREE.CanvasTexture(c);
+}
 
 // ---- 프리셋 3종 (각각 update(dt) 반환) ----
 const PRESETS = {
@@ -163,26 +199,112 @@ const PRESETS = {
     }
     return (dt) => { stars.rotation.y += dt * 0.012; for (let i = 0; i < nebs.length; i++) nebs[i].position.x += Math.sin(performance.now() * 0.0001 + i) * dt * 0.3; };
   },
-  // 하늘과 바다: 새벽빛 그라디언트 + 웨이브 셰이더 바다 + 구름 스프라이트
+  // 하늘과 바다 (F7 v1.7 개선): 위는 노을빛 하늘 + 태양, 아래는 일렁이는 바다 —
+  // 구름·윤슬이 흘러가 "하늘을 날아가는" 전진감을 준다.
   seasea(group, scene, cx, cz) {
-    scene.background = new THREE.Color(0x9cc0e0); scene.fog = new THREE.Fog(0xcadbe8, 24, 78);
-    const sky = gradientSky(0xffd9a8, 0x8fb6dc); sky.position.set(cx, 0, cz); group.add(sky);
+    scene.background = new THREE.Color(0x8fb6dc); scene.fog = new THREE.Fog(0xc9dcec, 30, 100);
+    const sky = gradientSky(0x3d7cc0, 0xffcf96); sky.position.set(cx, 0, cz); group.add(sky); // 위 파랑 → 지평선 노을
+    // 태양 + 글로우 (지평선 근처, 노을의 중심)
+    const sunTex = softTexture('rgba(255,240,205,1)');
+    const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
+    sun.position.set(cx + 12, 9, cz - 42); sun.scale.setScalar(16); group.add(sun);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, color: 0xffb070, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
+    glow.position.copy(sun.position); glow.scale.setScalar(42); group.add(glow);
+    // 바다: 다층 웨이브 + 깊이 2톤 + 시간 흐름(전진감)
     const wmat = new THREE.ShaderMaterial({
       transparent: true,
-      uniforms: { time: { value: 0 }, col: { value: new THREE.Color(0x3f6f9c) } },
-      vertexShader: 'uniform float time; varying float vh; void main(){ vec3 p=position; float w=sin(p.x*0.35+time)*0.25+cos(p.y*0.3+time*1.3)*0.22; vh=w; vec3 t=vec3(p.x,p.y,w); gl_Position=projectionMatrix*modelViewMatrix*vec4(t,1.0); }',
-      fragmentShader: 'varying float vh; uniform vec3 col; void main(){ gl_FragColor=vec4(col+vh*0.18, 0.9); }',
+      uniforms: { time: { value: 0 }, deep: { value: new THREE.Color(0x27567f) }, lite: { value: new THREE.Color(0x6ea6cc) } },
+      vertexShader: 'uniform float time; varying float vh; void main(){ vec3 p=position; float w=sin(p.x*0.22+time*1.1)*0.34+cos(p.y*0.19+time*0.8)*0.28+sin((p.x+p.y)*0.09+time*0.5)*0.22; vh=w; gl_Position=projectionMatrix*modelViewMatrix*vec4(p.x,p.y,w,1.0); }',
+      fragmentShader: 'varying float vh; uniform vec3 deep; uniform vec3 lite; void main(){ float t=clamp(vh*0.9+0.5,0.0,1.0); gl_FragColor=vec4(mix(deep,lite,t)+vh*0.12, 0.96); }',
     });
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(140, 140, IS_MOBILE ? 40 : 90, IS_MOBILE ? 40 : 90), wmat);
-    water.rotation.x = -Math.PI / 2; water.position.set(cx, -0.6, cz); group.add(water);
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(160, 160, IS_MOBILE ? 48 : 100, IS_MOBILE ? 48 : 100), wmat);
+    water.rotation.x = -Math.PI / 2; water.position.set(cx, -1.4, cz); group.add(water);
+    // 윤슬(물 위 반짝임) — 태양 방향으로 흐르는 포인트
+    const NS = IS_MOBILE ? 90 : 220;
+    const spos = new Float32Array(NS * 3);
+    for (let i = 0; i < NS; i++) { spos[i * 3] = cx + (Math.random() * 2 - 1) * 45; spos[i * 3 + 1] = -1.0 + Math.random() * 0.3; spos[i * 3 + 2] = cz + (Math.random() * 2 - 1) * 45; }
+    const sgeo = new THREE.BufferGeometry(); sgeo.setAttribute('position', new THREE.BufferAttribute(spos, 3));
+    const smat = new THREE.PointsMaterial({ color: 0xfff0c8, size: 0.22, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
+    group.add(new THREE.Points(sgeo, smat));
+    // 구름: 위아래 두 층이 서로 다른 속도로 흘러 전진감 강화
     const cloudTex = softTexture('rgba(255,255,255,.95)');
     const clouds = [];
-    for (let i = 0; i < (IS_MOBILE ? 6 : 12); i++) {
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.75, depthWrite: false }));
-      sp.position.set(cx + (Math.random() * 2 - 1) * 30, 9 + Math.random() * 10, cz + (Math.random() * 2 - 1) * 30);
-      sp.scale.set(8 + Math.random() * 8, 4 + Math.random() * 4, 1); group.add(sp); clouds.push(sp);
+    for (let i = 0; i < (IS_MOBILE ? 8 : 16); i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.55 + Math.random() * 0.3, depthWrite: false }));
+      sp.position.set(cx + (Math.random() * 2 - 1) * 38, 6 + Math.random() * 16, cz + (Math.random() * 2 - 1) * 38);
+      sp.scale.set(9 + Math.random() * 10, 4 + Math.random() * 5, 1); group.add(sp);
+      sp.userData.sp = 1.2 + Math.random() * 1.6; clouds.push(sp);
     }
-    return (dt) => { wmat.uniforms.time.value += dt; for (const c of clouds) { c.position.x += dt * 0.6; if (c.position.x > cx + 34) c.position.x = cx - 34; } };
+    let t = 0;
+    return (dt) => {
+      t += dt;
+      wmat.uniforms.time.value += dt;
+      smat.opacity = 0.5 + 0.35 * Math.sin(t * 2.2); // 윤슬 명멸
+      for (const c of clouds) { c.position.x += dt * c.userData.sp; if (c.position.x > cx + 42) c.position.x = cx - 42; }
+    };
+  },
+  // 바다속 (F8 v1.7 신규): 위에서 스며드는 빛줄기 + 상승 기포 + 유영하는 물고기 + 플랑크톤
+  ocean(group, scene, cx, cz) {
+    scene.background = new THREE.Color(0x07293d); scene.fog = new THREE.Fog(0x0a3a52, 10, 50);
+    const sky = gradientSky(0x2f89ad, 0x041520); sky.position.set(cx, 0, cz); group.add(sky); // 위 = 수면 빛
+    // 모랫바닥
+    const sand = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.MeshBasicMaterial({ color: 0x1c4a5e }));
+    sand.rotation.x = -Math.PI / 2; sand.position.set(cx, -2.2, cz); group.add(sand);
+    // 빛줄기(god ray): 세로 그라디언트 텍스처 additive 플레인
+    const rayTex = vGradientTexture('rgba(190,235,255,.55)');
+    const rays = [];
+    for (let i = 0; i < (IS_MOBILE ? 4 : 7); i++) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(3 + Math.random() * 3, 30),
+        new THREE.MeshBasicMaterial({ map: rayTex, transparent: true, opacity: 0.1 + Math.random() * 0.08, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      m.position.set(cx + (Math.random() * 2 - 1) * 16, 12, cz + (Math.random() * 2 - 1) * 16);
+      m.rotation.y = Math.random() * Math.PI; m.rotation.z = (Math.random() * 2 - 1) * 0.16;
+      group.add(m); rays.push(m);
+    }
+    // 기포: 상승 + 좌우 미세 흔들림, 위에 닿으면 아래서 재시작
+    const NB = IS_MOBILE ? 80 : 200;
+    const bpos = new Float32Array(NB * 3), bsp = new Float32Array(NB);
+    for (let i = 0; i < NB; i++) {
+      bpos[i * 3] = cx + (Math.random() * 2 - 1) * 16; bpos[i * 3 + 1] = Math.random() * 16 - 2; bpos[i * 3 + 2] = cz + (Math.random() * 2 - 1) * 16;
+      bsp[i] = 0.5 + Math.random() * 1.1;
+    }
+    const bgeo = new THREE.BufferGeometry(); bgeo.setAttribute('position', new THREE.BufferAttribute(bpos, 3));
+    const bubbles = new THREE.Points(bgeo, new THREE.PointsMaterial({ color: 0xbfe8f5, size: 0.14, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }));
+    group.add(bubbles);
+    // 물고기 떼: 절차 생성(타원 몸통 + 꼬리), 서로 다른 반경·높이·속도로 회유
+    const fish = [];
+    const fgeo = new THREE.SphereGeometry(1, 10, 8);
+    for (let i = 0; i < (IS_MOBILE ? 6 : 12); i++) {
+      const g = new THREE.Group();
+      const col = new THREE.Color().setHSL(0.5 + Math.random() * 0.12, 0.5, 0.55 + Math.random() * 0.2);
+      const fmat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85 });
+      const body = new THREE.Mesh(fgeo, fmat); body.scale.set(0.12, 0.14, 0.34); g.add(body);
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.22, 6), fmat);
+      tail.rotation.x = -Math.PI / 2; tail.position.z = -0.42; g.add(tail);
+      g.userData = { r: 3.5 + Math.random() * 10, h: 0.5 + Math.random() * 8, sp: 0.15 + Math.random() * 0.4, ph: Math.random() * Math.PI * 2, dir: Math.random() < 0.5 ? 1 : -1 };
+      group.add(g); fish.push(g);
+    }
+    // 플랑크톤 부유 입자
+    const dust = starPoints(IS_MOBILE ? 300 : 800, cx, cz);
+    dust.material.size = 0.06; dust.material.opacity = 0.4; dust.material.color.set(0x9fd0e0);
+    group.add(dust);
+    let t = 0;
+    return (dt) => {
+      t += dt;
+      const pa = bgeo.attributes.position.array;
+      for (let i = 0; i < NB; i++) {
+        pa[i * 3 + 1] += bsp[i] * dt;
+        pa[i * 3] += Math.sin(t * 2 + i) * dt * 0.12;
+        if (pa[i * 3 + 1] > 16) pa[i * 3 + 1] = -2;
+      }
+      bgeo.attributes.position.needsUpdate = true;
+      for (const f of fish) {
+        const u = f.userData, a = u.ph + t * u.sp * u.dir;
+        f.position.set(cx + Math.cos(a) * u.r, u.h + Math.sin(t * 0.7 + u.ph) * 0.4, cz + Math.sin(a) * u.r);
+        f.rotation.y = Math.atan2(-Math.sin(a) * u.dir, Math.cos(a) * u.dir); // 접선(진행) 방향
+      }
+      for (let i = 0; i < rays.length; i++) rays[i].rotation.z = Math.sin(t * 0.25 + i) * 0.14;
+      dust.rotation.y += dt * 0.008;
+    };
   },
   // 빛의 정원: 어두운 공간에 형형색색 발광 구체 수백 개 부유·명멸
   garden(group, scene, cx, cz) {

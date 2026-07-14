@@ -303,7 +303,7 @@ function renderRoomProps() {
     <div class="panel-title" style="margin-top:14px">피날레 (몽환 체험)</div>
     <div class="hint-note">이 방에 들어서면 몽환 공간으로 전환됩니다. 절차적 연출(이미지 에셋 없음).</div>
     <div class="field"><label>공간 프리셋</label>
-      <div class="seg" data-fin-preset>${[['random', '랜덤'], ['space', '우주'], ['seasea', '하늘·바다'], ['garden', '빛의 정원']].map(([v, l]) => `<button data-v="${v}" class="${(room.finale.preset || 'random') === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+      <div class="seg" data-fin-preset>${[['random', '랜덤'], ['space', '우주'], ['seasea', '하늘·바다'], ['ocean', '바다속'], ['garden', '빛의 정원']].map(([v, l]) => `<button data-v="${v}" class="${(room.finale.preset || 'random') === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>
     <div class="field"><label>복귀 지점 (전시 마치기 후)</label>
       <select data-fin-return style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:7px">
         <option value="__lobby__" ${room.finale.returnTo === '__lobby__' ? 'selected' : ''}>로비</option>
@@ -312,7 +312,15 @@ function renderRoomProps() {
     <div class="toggle-row"><label>마무리 메시지 표시</label><div class="switch ${room.finale.showMessages !== false ? 'on' : ''}" data-fin-showmsg></div></div>
     ${room.finale.showMessages !== false ? `
     <div class="field"><label>메시지 (줄 단위 · 순서대로 표시)</label><textarea data-fin-messages rows="4" placeholder="전시는 어떠셨나요?&#10;재미있게 보셨나요?&#10;다음에 또 만나요">${text((room.finale.messages || []).join('\n'))}</textarea></div>
-    <div class="field"><label>줄당 유지 시간 (초)</label><input type="number" step="0.5" min="1" max="15" data-fin-dwell value="${room.finale.dwellSec ?? 4}"></div>` : ''}` : ''}
+    <div class="field"><label>줄당 유지 시간 (초)</label><input type="number" step="0.5" min="1" max="15" data-fin-dwell value="${room.finale.dwellSec ?? 4}"></div>
+    <div class="field"><label>메시지 폰트</label>
+      <div class="seg" data-fin-msgfont>${[['pretendard', '프리텐다드'], ['noto-sans', '노토 산스'], ['serif', '명조']].map(([v, l]) => `<button data-v="${v}" class="${(room.finale.msgStyle?.font || 'pretendard') === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+    <div class="field"><label>메시지 크기</label>
+      <div class="seg" data-fin-msgsize>${[['s', '작게'], ['m', '보통'], ['l', '크게']].map(([v, l]) => `<button data-v="${v}" class="${(room.finale.msgStyle?.size || 'm') === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+    <div class="field"><label>등장 위치</label>
+      <div class="seg" data-fin-msgpos>${[['top', '상단'], ['center', '중앙'], ['bottom', '하단']].map(([v, l]) => `<button data-v="${v}" class="${(room.finale.msgStyle?.pos || 'center') === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+    <div class="field"><label>메시지 색</label>
+      <input type="color" data-fin-msgcolor value="${room.finale.msgStyle?.color || '#ffffff'}" style="width:40px;height:28px;border:none;border-radius:6px;background:none;cursor:pointer"></div>` : ''}` : ''}
     ${roomType === 'media' && room.screen ? `
     <div class="panel-title" style="margin-top:14px">미디어 스크린 (16:9)</div>
     <div class="hint-note">미디어 룸은 조명이 자동으로 어두워집니다. 아래에서 밝기를 따로 조절할 수 있습니다.</div>
@@ -481,6 +489,12 @@ function renderRoomProps() {
   root.querySelector('[data-fin-showmsg]')?.addEventListener('click', () => { upd(r => { if (r.finale) r.finale.showMessages = r.finale.showMessages === false; }, { silent: false }); renderRoomProps(); });
   root.querySelector('[data-fin-messages]')?.addEventListener('input', e => upd(r => { if (r.finale) r.finale.messages = e.target.value.split('\n').map(s => s.trim()).filter(s => s.length); }, { coalesce: `fin.msg:${room.id}` }));
   root.querySelector('[data-fin-dwell]')?.addEventListener('input', e => upd(r => { if (r.finale) { const v = parseFloat(e.target.value); if (isFinite(v)) r.finale.dwellSec = Math.max(1, Math.min(15, v)); } }, { coalesce: `fin.dwell:${room.id}` }));
+  // F10(v1.7): 마무리 메시지 스타일 (폰트/크기/위치/색)
+  const finMs = (r) => { r.finale.msgStyle = r.finale.msgStyle || {}; return r.finale.msgStyle; };
+  root.querySelector('[data-fin-msgfont]')?.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { upd(r => { if (r.finale) finMs(r).font = b.dataset.v; }, { silent: false }); renderRoomProps(); } });
+  root.querySelector('[data-fin-msgsize]')?.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { upd(r => { if (r.finale) finMs(r).size = b.dataset.v; }, { silent: false }); renderRoomProps(); } });
+  root.querySelector('[data-fin-msgpos]')?.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { upd(r => { if (r.finale) finMs(r).pos = b.dataset.v; }, { silent: false }); renderRoomProps(); } });
+  root.querySelector('[data-fin-msgcolor]')?.addEventListener('input', e => upd(r => { if (r.finale) finMs(r).color = e.target.value; }, { coalesce: `fin.msgcolor:${room.id}` }));
   root.querySelector('[data-screen-source]')?.addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) { upd(r => { if (r.screen) r.screen.source = b.dataset.v; }, { silent: false }); renderRoomProps(); } });
   root.querySelector('[data-screen-video]')?.addEventListener('change', e => uploadVideo(e.target.files[0], room.id));
   root.querySelector('[data-screen-video-clear]')?.addEventListener('click', () => { upd(r => { if (r.screen) r.screen.file = ''; }, { silent: false }); renderRoomProps(); });
