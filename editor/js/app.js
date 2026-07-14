@@ -334,7 +334,7 @@ function renderRoomProps() {
     ${(room.screen.source || 'upload') === 'upload' ? `
     <label class="lib-browse" style="display:block;text-align:center;margin-top:2px;font-size:12px">${room.screen.file ? '영상 교체' : '영상 업로드'} (mp4/webm · 최대 100MB)<input type="file" accept="video/mp4,video/webm" data-screen-video hidden></label>
     ${room.screen.file
-      ? `<div class="hint-note">영상 적용됨 · 소리와 함께 자동 재생됩니다 (브라우저가 차단하면 첫 클릭 시 소리가 켜집니다). <button class="tb-btn" data-screen-video-clear style="font-size:11px;padding:2px 8px;margin-left:4px">제거</button></div>`
+      ? `<div class="hint-note">영상 적용됨 · 관람객이 미디어 방에 들어가면 소리와 함께 재생됩니다. <button class="tb-btn" data-screen-video-clear style="font-size:11px;padding:2px 8px;margin-left:4px">제거</button></div>`
       : `<div class="hint-note">긴 영상은 GitHub 파일당 100MB 제한 — 초과 시 업로드가 차단됩니다.</div>`}
     <div class="toggle-row"><label>자동재생 (소리 포함)</label><div class="switch ${room.screen.autoplay !== false ? 'on' : ''}" data-screen-autoplay></div></div>` : ''}
     <div class="field"><label>스크린 벽</label>

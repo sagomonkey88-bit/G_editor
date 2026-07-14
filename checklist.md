@@ -270,3 +270,8 @@
 ## F12. viewer/data 테스트본 ✅
 - [x] publish.zip data → viewer/data 추출(46MB, 최대 파일 41MB — GitHub 100MB 이내) + 갱신 방법 README
 - [x] 검증: /viewer/index.html 단독 접속 → 퍼블리시 미술관 로드
+
+## v1.7.1 보완 (같은 날 2차 피드백) ✅
+- [x] 유영 포즈: 엎드려 날기(+1.2/+0.6), 머리=진행 방향, FLOAT_ACC 8 — 검증: headVsMoveDiff 0.00, 0.74m/s
+- [x] 미디어 소리: 방 입장 시에만 재생(방 게이팅) + 플레이어 볼륨 슬라이더(mp-vol, userVol)
+- [x] seasea: 뭉게구름·태양 윤슬 길·갈매기 / ocean: 코스틱스 2겹·해초 잎·바위·물고기 떼 — 스크린샷 검증

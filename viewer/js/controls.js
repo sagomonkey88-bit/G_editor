@@ -14,7 +14,7 @@ const PITCH_DOWN_MAX = -0.6;           // 아래 약 34°
 const PITCH_DEFAULT = -0.23;           // 기존 프레이밍과 동등한 살짝 내려다보기
 const FLOOR_Y = 0.35, CEIL_SAFE = 3.3; // 카메라 바닥/보수적 천장 한계
 const SIT_Y = 0.32;                    // P3-2 착석 시 아바타 높이(좌석에 앉은 느낌)
-const FLOAT_ACC = 2.4, FLOAT_MAXV = 2.0, FLOAT_R = 14; // P4-3 부유: 가속·최고속·구형 경계 반경
+const FLOAT_ACC = 8, FLOAT_MAXV = 2.0, FLOAT_R = 14; // P4-3 부유: 가속·최고속·구형 경계 반경 (v1.7.1: 유영감 있게 가속↑)
 
 export class PlayerControls {
   constructor(avatar, camera, colliders, dom, opts = {}) {

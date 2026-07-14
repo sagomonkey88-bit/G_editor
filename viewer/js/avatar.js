@@ -561,11 +561,12 @@ function makeUpdater(rig, parts) {
     } else if (parts.feetL?.length) {
       setFeet(parts.feetL, 0, 0); setFeet(parts.feetR, 0, 0);
     }
-    // F6: 부유 모드 = 하늘을 보고 누운 포즈 (이동 중엔 머리를 살짝 든다)
-    const targetTilt = pose === 'float' ? (moving ? -1.05 : -1.3) : 0;
+    // F6(v1.7.1): 부유 모드 = 엎드려 나는 유영 포즈 — 머리가 진행 방향(+Z)을 향해
+    // 방향키 위 = 머리 쪽으로 나아간다. 정지 시에도 살짝 엎드린 채 물에 뜬 느낌.
+    const targetTilt = pose === 'float' ? (moving ? 1.2 : 0.6) : 0;
     rigTilt += (targetTilt - rigTilt) * Math.min(1, dt * 3);
     rig.rotation.x = rigTilt;
-    rig.position.z = Math.sin(-rigTilt) * 0.55; // 눕으면 몸이 뒤로 밀리는 것 보정
+    rig.position.z = Math.sin(-rigTilt) * 0.55; // 기울기로 몸이 밀리는 것 보정
     const speed = moving ? (speed01 ?? 1) : 0;
     amp += ((moving ? 1 : 0) - amp) * Math.min(1, dt * 8);
     if (moving) phase += dt * (7 + 4 * speed);

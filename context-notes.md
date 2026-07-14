@@ -202,3 +202,11 @@ Opus 4.8 이 구현한 v1.6 에 대한 사용자 실사용 피드백 12건(F1~F1
 - 브라우저 패널 탭은 rAF 가 0 으로 스로틀됨 → animate 루프 자체가 안 돌아 실시간 검증 불가. **수동 스텝**(controls.update/seating.update/presetUpdate 를 JS 로 N회 호출) + renderer.render + toDataURL 캡처로 검증.
 - _devserver.mjs 에 POST /__capture(dataURL → _cap_*.png 저장) 재추가해 둠(gitignored, 배포 무관). mp4/webm MIME 도 추가(viewer/data 영상 서빙).
 - 세션 스크래치의 museum-dev.mjs 래퍼(recatch .claude/launch.json 'museum-dev', 포트 8779)로 브라우저 패널에서 서버 구동 — cwd 를 museum 루트로 chdir.
+
+## v1.7.1 피드백 보완 (2026-07-14, 같은 날 2차)
+- **유영 포즈 반전**: v1.7 의 "누워서(배영)" 포즈가 사용자 체감상 조작 반대(발 방향 전진)로 느껴짐 → **엎드려 나는 유영**으로 변경. rig.rotation.x = +1.2(이동)/+0.6(정지) — 머리(+Z, avatarYaw 방향)가 진행 방향. FLOAT_ACC 2.4→8 (평형 속도 ≈0.25→0.75m/s, 유영감).
+- **미디어 소리 게이팅**: 스크린 볼륨 = (현재 방 == 스크린 방) ? userVol × 거리감쇠 : 0. currentRoomIndex 를 animate 에서 1회 계산해 finale/모바일 라이트와 공유. 풀스크린 플레이어 열림 중에는 루프가 볼륨을 건드리지 않음(플레이어 슬라이더가 직접 제어).
+- **볼륨 슬라이더**: 플레이어 바 mp-vol(0~1). screen 객체의 userVol 에 저장(런타임 전용 — 저장 스키마 아님, 리빌드 시 1로 리셋). 슬라이더 올리면 자동 음소거 해제.
+- **seasea 추가 개선**: cloudTexture(블롭 합성 뭉게구름), 태양 방향 윤슬 길(glitter path 포인트), 갈매기 실루엣 4마리.
+- **ocean 추가 개선**: causticsTexture 2겹 스크롤(repeat 26 — 7이면 링이 거대해짐 주의), leafTexture 해초 12(뿌리 피벗 sway), 바위 7, 물고기 떼 3무리×8(공유 머티리얼) + 단독 7.
+- 절차적 생성 한계 도달 — 더 높은 퀄리티는 에셋 필요(스카이 파노라마, water normal, GLB 물고기, 앰비언트 사운드). 사용자에게 스펙 안내함. 에셋 수급 시 finale 에 프리셋별 에셋 슬롯(assets: { sky, waterNormal, ... }) 설계 필요.

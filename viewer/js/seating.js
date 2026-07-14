@@ -54,7 +54,10 @@ export class Seating {
           <span class="mp-time" style="opacity:.8;min-width:90px">0:00 / 0:00</span>
           <span style="flex:1"></span>
           <span class="mp-speeds" style="display:flex;gap:4px"></span>
-          <button class="mp-mute">🔊</button>
+          <span style="display:flex;align-items:center;gap:4px">
+            <button class="mp-mute">🔊</button>
+            <input class="mp-vol" type="range" min="0" max="1" step="0.05" value="1" style="width:90px;accent-color:#e6c878;cursor:pointer" title="음량">
+          </span>
           <button class="mp-close">✕ 닫기 (ESC)</button>
         </div>
       </div>`;
@@ -74,6 +77,14 @@ export class Seating {
     ov.querySelector('.mp-fwd').addEventListener('click', () => { const v = V(); if (v) v.currentTime = Math.min(v.duration || 1e9, v.currentTime + 10); });
     ov.querySelector('.mp-restart').addEventListener('click', () => { const v = V(); if (v) { v.currentTime = 0; v.play(); this._syncPlayBtn(); } });
     ov.querySelector('.mp-mute').addEventListener('click', () => { const v = V(); if (!v) return; v.muted = !v.muted; ov.querySelector('.mp-mute').textContent = v.muted ? '🔇' : '🔊'; });
+    // v1.7.1: 음량 슬라이더 — 사용자 설정 볼륨(userVol)은 벽 스크린 거리 감쇠에도 곱해진다
+    ov.querySelector('.mp-vol').addEventListener('input', (e) => {
+      const v = V(); if (!v) return;
+      const vol = parseFloat(e.target.value);
+      if (this.activeScreen) this.activeScreen.userVol = vol;
+      v.volume = vol;
+      if (v.muted && vol > 0) { v.muted = false; ov.querySelector('.mp-mute').textContent = '🔊'; }
+    });
     ov.querySelector('.mp-close').addEventListener('click', () => this.closePlayer());
     this.seek.addEventListener('input', () => { const v = V(); if (v && v.duration) { this._seeking = true; v.currentTime = (this.seek.value / 100) * v.duration; } });
     this.seek.addEventListener('change', () => { this._seeking = false; });
@@ -130,6 +141,8 @@ export class Seating {
     v.muted = false; // 상호작용 시 음소거 해제
     this.stage.appendChild(v);
     v.play?.().catch(() => {});
+    v.volume = this.activeScreen.userVol ?? 1; // 플레이어 열림 = 거리 감쇠 없이 사용자 볼륨
+    this.player.querySelector('.mp-vol').value = String(this.activeScreen.userVol ?? 1);
     this.player.querySelector('.mp-mute').textContent = v.muted ? '🔇' : '🔊';
     this._markSpeed(v.playbackRate || 1);
     this._syncPlayBtn();

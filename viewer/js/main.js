@@ -423,16 +423,22 @@ async function boot() {
       controls.update(dt);
       if (interactions) interactions.update(dt);
       if (seating) seating.update();
-      if (finale) finale.update(dt, currentRoomIndex(controls.pos, layout));
-      // F1(v1.7): 스크린 영상 볼륨 거리 감쇠 — 가까울수록 크게, 멀면(다른 방) 무음
-      for (const sc of (world.screens || [])) {
-        if (!sc.video || sc.video.muted) continue;
-        const d = Math.hypot(sc.center.x - controls.pos.x, sc.center.z - controls.pos.y);
-        sc.video.volume = Math.max(0, Math.min(1, 1 - (d - 4) / 12));
+      const ci = currentRoomIndex(controls.pos, layout);
+      if (finale) finale.update(dt, ci);
+      // F1(v1.7.1): 스크린 영상 소리는 **그 미디어 방에 들어가야만** 재생 —
+      // 방 밖(다른 방·복도)에서는 무음. 방 안에서는 사용자 볼륨 × 거리 감쇠.
+      // 풀스크린 플레이어가 열려 있으면 플레이어(사용자 볼륨)가 직접 제어.
+      if (!seating?.playerOpen) {
+        for (const sc of (world.screens || [])) {
+          if (!sc.video || sc.video.muted) continue;
+          const inRoom = ci >= 0 && layout.rooms[ci]?.id === sc.roomId;
+          if (!inRoom) { sc.video.volume = 0; continue; }
+          const d = Math.hypot(sc.center.x - controls.pos.x, sc.center.z - controls.pos.y);
+          sc.video.volume = Math.max(0, Math.min(1, 1 - (d - 4) / 12)) * (sc.userVol ?? 1);
+        }
       }
       // 라이트 매니저: 모바일은 현재 룸의 조명만 활성(§5.8)
       if (isMobile && (arts.spots.length || world.moodLights.length)) {
-        const ci = currentRoomIndex(controls.pos, layout);
         if (ci !== lastRoom) {
           lastRoom = ci;
           for (const s of arts.spots) s.spot.visible = (s.roomIndex === ci);
