@@ -181,3 +181,24 @@
 - 방 타입은 schema `room.roomType` 신설(부재=gallery). 자동배치 `layoutAll`/`layoutRoom`(autoLayout.js)은 p.rooms 순회 → 비 gallery 는 computeRoomPlan/ensureSectionText 건너뜀(reflowOrigins 은 유지 — 위치·문 체인 참여). 텔레포트 destinations(teleport.js)는 방 순서 그대로 = 미디어/피날레 포함(현행).
 - 미디어룸 어둠 = **P2 `ceiling.lightIntensity`** 재사용(범용 방 조명). roomType='media' 로 만들 때 기본 낮은 값 세팅.
 - 스크린/벤치 = world.js 절차 생성(P2 소품 방식 공유 지오). 스크린 16:9 고정, 벽면 배치(도어/텍스트 오브젝트처럼 wallLeftToWorld + 벽 법선 오프셋).
+
+# v1.7 사용자 피드백 패치 컨텍스트 노트 (2026-07-14)
+
+## 배경
+Opus 4.8 이 구현한 v1.6 에 대한 사용자 실사용 피드백 12건(F1~F12)을 반영. 별도 지시문 문서 없음 — checklist.md v1.7 섹션이 스펙 역할.
+
+## 주요 결정
+- **F1 영상 소리**: 비음소거 자동재생을 먼저 시도하고, 브라우저가 차단하면 음소거 재생 + 첫 제스처(pointerdown/keydown)에서 소리 복구(world.js autoplayWithSound). 일반 플로우에서는 캐릭터 선택 클릭이 제스처가 되므로 사실상 항상 소리 재생. **볼륨은 main.js animate 에서 스크린과의 거리로 감쇠**(4m 내 1.0 → 16m 0) — video 요소가 DOM 밖(VideoTexture)이라 공간 음향이 없어서 다른 방 소리 새는 문제를 이걸로 해결. 입장 전(시작 화면)에는 volume 0.
+- **F2 방 전체 밝기**: 전역 조명(hemi/amb/key)은 방별 제어 불가 → **표면 머티리얼 색 감쇠**로 구현. roomDim(li)=clamp(0.2+0.8li, 0.16, 1). 벽은 면(claim) 단위라 공유벽도 방마다 다른 감쇠 적용 가능. 걸레받이/몰딩은 dim 값별 머티리얼 캐시(trimMats), 단면(문설주)은 pos 면 기준. li>1 은 표면 감쇠 없음(포인트라이트 배수만 증가 — 기존 동작).
+- **F4 착석 뷰**: 착석 시 camYaw = yaw-2.2(앞-측면 126°) — 캐릭터 정면+발이 보임. 스크린 감상은 드래그 또는 풀스크린 버튼. **벤치 콜라이더에 low:true 태그** → controls._segHit(카메라 레이마치)에서 제외 (착석 측면 카메라가 옆 벤치에 막혀 아바타가 숨겨지던 문제). 이동 충돌에는 여전히 포함.
+- **F4/F6 아바타 pose 파라미터**: avatar.userData.update(dt, moving, speed01, pose) 4번째 인자 추가('seated'|'float'|undefined). 발 참조는 parts.feetL/feetR (부엉이는 발가락 포함). 발 동동 = position.y 교대 들썩임(회전은 보조). float 는 rig.rotation.x 를 -1.3(정지)/-1.05(이동)로 러프 — rig 피벗이 발밑이라 rig.position.z=sin(-tilt)*0.55 로 뒤 밀림 보정.
+- **F5 프롬프트 충돌**: 같은 E 키를 interact(자세히보기)와 seating(앉기)이 동시에 먹던 것이 "팝업 안 사라짐"의 원인. Interactions._suppressed() = seated || playerOpen || **seating.near(벤치 근접 시 앉기 우선)** 로 억제.
+- **F9 랜덤 순환**: localStorage 'museum-finale-rot' 에 마지막 인덱스 저장, 다음 진입 시 +1 순환. 프로젝트 구분 없이 전역 키(단순함 우선 — 관객 입장에서는 충분).
+- **F10 msgStyle**: finale.msgStyle { font(TEXT_FONTS), size s/m/l(22/30/42px), color, pos top/center/bottom(16/36/62%) }. 뷰어는 부재 시 기본값 폴백 — 구 프로젝트 무마이그레이션 호환. 'sans' 폰트는 Pretendard 로 매핑(기존 텍스트 시스템과 동일 컨벤션).
+- **F11 미리보기 폴백**: preview=1 에서 opener/parent 없으면 600ms 후 ./data/museum.json 시도(성공 시 baseDir './data/'), 실패 시 한글 안내 reject. 호스트가 있어도 4s 무응답이면 폴백(이후 에디터 데이터 오면 rebuild 로 덮임).
+- **F12**: publish.zip 의 data/ 를 viewer/data 로 추출 커밋(46MB, 최대 단일 파일 41MB mp4 — GitHub 100MB 제한 내). viewer/index.html 기본 로드 경로(./data/museum.json)와 일치 → 깃허브 페이지스 /viewer/ 로 누구나 관람. 갱신 절차는 viewer/data/README.md.
+
+## 검증 인프라 메모
+- 브라우저 패널 탭은 rAF 가 0 으로 스로틀됨 → animate 루프 자체가 안 돌아 실시간 검증 불가. **수동 스텝**(controls.update/seating.update/presetUpdate 를 JS 로 N회 호출) + renderer.render + toDataURL 캡처로 검증.
+- _devserver.mjs 에 POST /__capture(dataURL → _cap_*.png 저장) 재추가해 둠(gitignored, 배포 무관). mp4/webm MIME 도 추가(viewer/data 영상 서빙).
+- 세션 스크래치의 museum-dev.mjs 래퍼(recatch .claude/launch.json 'museum-dev', 포트 8779)로 브라우저 패널에서 서버 구동 — cwd 를 museum 루트로 chdir.

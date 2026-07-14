@@ -215,36 +215,58 @@
 - [x] 검증: 착석→fsBtn·활성영상, 오버레이 열림(video stage 이동·unmute·재생), 배속1.5·+10초 클램프·play/pause·시크·mute, 닫기(복귀·재음소거·동기화), FILM 25 프레임 렌더 확인, 콘솔 클린
 - [x] 커밋 `feat(v1.6): P3-4 …`
 
-# v1.7 사용자 피드백 패치 (2026-07-14)
+# v1.7 사용자 피드백 패치 (2026-07-14) ✅ 전 항목 완료
 
-## F1. 영상 소리 재생 (음소거 강제 해제)
-- [ ] world.js buildScreen: 비음소거 자동재생 시도 → 차단 시 음소거 재생 + 첫 제스처에서 소리 켜기
-- [ ] main.js animate: 스크린 거리 기반 볼륨 감쇠 (다른 방에서 안 들리게)
-- [ ] seating.js closePlayer: 벽 스크린 강제 재음소거 제거
-- [ ] app.js 안내문구 갱신
+## F1. 영상 소리 재생 ✅
+- [x] world.js buildScreen: 비음소거 자동재생 시도 → 차단 시 음소거 재생 + 첫 제스처(클릭/키)에서 소리 켜기 (autoplayWithSound)
+- [x] main.js animate: 스크린 거리 기반 볼륨 감쇠(4m 내 100% → 16m 0%) + 입장 전(시작 화면) 무음
+- [x] seating.js closePlayer: 벽 스크린 강제 재음소거 제거 (소리 유지)
+- [x] app.js 안내문구 갱신 ("소리와 함께 자동 재생")
+- [x] 검증: 뷰어에서 muted:false 재생 확인
 
-## F2. 방 전체 밝기 (lightIntensity 가 방 전체 표면에 적용)
-- [ ] world.js: 방별 dim 팩터 → 벽 면/바닥/천장/걸레받이/몰딩 머티리얼 색 감쇠
-- [ ] app.js 슬라이더 라벨 "방 전체 밝기"로
+## F2. 방 전체 밝기 ✅
+- [x] world.js roomDim(): lightIntensity(0~2) → 표면 감쇠 0.2+0.8li (하한 0.16). 벽 면별/바닥/천장/천장화/걸레받이/몰딩/상인방/단방향 패치 모두 적용
+- [x] app.js 라벨 "방 전체 밝기 (벽·바닥·천장·조명)"
+- [x] 검증: 미디어룸(li=0) 평균밝기 8.5 vs 갤러리(li=1) 38.8
 
-## F3. 미디어 룸 전용 밝기 슬라이더 + 더 어두운 기본값
-- [ ] app.js 미디어 섹션에 밝기 슬라이더 추가 (ceiling.lightIntensity 공유)
+## F3. 미디어 룸 전용 밝기 ✅
+- [x] app.js 미디어 섹션 data-media-light 슬라이더(0~1.5, ceiling.lightIntensity 공유), 미디어 전환 기본 0.3
 
-## F4. 착석 시 캐릭터 보이기 + 발 동동 애니메이션
-- [ ] avatar.js: 4종 빌더 feet 참조 수집 + updater pose 파라미터('seated' 발 번갈아 동동)
-- [ ] controls.js sit(): 카메라 측면 각도로 캐릭터 보이게, seated 분기 pose 전달
+## F4. 착석 캐릭터 + 발 동동 ✅
+- [x] avatar.js: 4종 빌더 feetL/feetR 참조(부엉이 발가락 포함) + makeUpdater pose='seated' 발 교대 들썩임(0.09m/5.6Hz)
+- [x] controls.js sit(): 카메라 앞-측면(yaw-2.2) — 앉은 캐릭터 정면·발 보임. 벤치 콜라이더 low 태그 → 카메라 충돌 제외
+- [x] 검증: 착석 스크린샷(발 교대 위치 변화 [0.058/0.050]→[0.050/0.100]), avatarVisible true
 
-## F5. 착석/플레이어 팝업 오류 수정
-- [ ] interact.js: 착석 중/플레이어 열림 시 자세히보기 프롬프트 숨김 + E 충돌 가드
-- [ ] main.js: interactions.seating 연결
+## F5. 착석/플레이어 팝업 오류 ✅
+- [x] interact.js _suppressed(): 착석 중·플레이어 열림·벤치 근접 시 자세히보기 프롬프트 숨김 + E 충돌 가드
+- [x] main.js interactions.seating 연결
+- [x] 검증: 벤치 근접·착석 시 artPrompt none
 
-## F6. 피날레 부유 = 누워서 나는 포즈
-- [ ] avatar.js pose 'float': rig 눕히기 + 발 flutter
-- [ ] controls.js _updateFloat: pose 전달
+## F6. 피날레 부유 = 누워서 날기 ✅
+- [x] avatar.js pose='float': rig.rotation.x → -1.3(정지, 하늘 보고 눕기)/-1.05(이동) + 뒤 밀림 보정 + 발 흔들기(3.2Hz)
+- [x] controls.js _updateFloat: pose 전달
+- [x] 검증: rigTiltX -1.29, 스크린샷 눕기 확인
 
-## F7. 하늘·바다 프리셋 그래픽 개선 (아래 바다/위 하늘/태양/반짝임/전진감)
-## F8. 바다속(ocean) 프리셋 추가 (schema FINALE_PRESETS + 에디터 seg + 뷰어)
-## F9. 랜덤 프리셋 방문마다 순환 (localStorage)
-## F10. 마무리 메시지 스타일 편집 (폰트/크기/색/위치) — schema msgStyle + 에디터 UI + 뷰어 적용
-## F11. preview=1 외부 접근 폴백 (./data/museum.json → 안내 메시지)
-## F12. viewer/data 에 publish.zip 데이터 추출 → /viewer/index.html 단독 관람
+## F7. 하늘·바다 그래픽 개선 ✅
+- [x] 노을 그라디언트(위 파랑→지평선 노을) + 태양·글로우 스프라이트 + 다층 웨이브 2톤 바다(발 아래 -3.4m) + 윤슬 명멸 + 2층 구름 전진 흐름
+- [x] 검증: 스크린샷
+
+## F8. 바다속(ocean) 프리셋 ✅
+- [x] schema FINALE_PRESETS + 에디터 seg '바다속' + 뷰어: 빛줄기·상승 기포·물고기 12마리 회유·플랑크톤·모랫바닥
+- [x] 검증: 스크린샷·에디터 버튼 렌더
+
+## F9. 랜덤 순환 ✅
+- [x] pickPreset: localStorage 'museum-finale-rot' 순환 (space→seasea→ocean→garden→…)
+- [x] 검증: 5회 진입 시퀀스 확인
+
+## F10. 메시지 스타일 편집 ✅
+- [x] schema makeFinaleMsgStyle { font, size(s/m/l), color, pos(top/center/bottom) } + 에디터 UI(폰트/크기/위치 seg + 색) + 뷰어 _applyMsgStyle
+- [x] 검증: serif·42px·#ffe9a8·top 적용 확인
+
+## F11. 미리보기 외부 접근 폴백 ✅
+- [x] main.js loadFromPreview: 에디터 응답 없으면(외부 공유 링크) ./data/museum.json 폴백, 그것도 없으면 한글 안내
+- [x] 검증: ?preview=1 단독 접속 → 5개 방 부팅
+
+## F12. viewer/data 테스트본 ✅
+- [x] publish.zip data → viewer/data 추출(46MB, 최대 파일 41MB — GitHub 100MB 이내) + 갱신 방법 README
+- [x] 검증: /viewer/index.html 단독 접속 → 퍼블리시 미술관 로드
