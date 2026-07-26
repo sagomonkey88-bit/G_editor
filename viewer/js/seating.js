@@ -18,8 +18,10 @@ export class Seating {
   }
 
   _buildDom(root) {
-    const coarse = new URLSearchParams(location.search).get('touch') === '1'
-      || !!window.matchMedia?.('(pointer: coarse)').matches;
+    const q = new URLSearchParams(location.search).get('touch');
+    // v1.8: main.js detectTouch() 와 같은 규칙 (iPadOS 13+ 는 UA 로 잡히지 않는다)
+    const coarse = q === '1' || (q !== '0' && (!!window.matchMedia?.('(pointer: coarse)').matches
+      || (!window.matchMedia?.('(any-pointer: fine)').matches && (navigator.maxTouchPoints || 0) > 0)));
     this.prompt = document.createElement('button');
     this.prompt.className = 'zoom-prompt no-cam-drag';
     this.prompt.innerHTML = coarse ? `<span>앉기 (터치)</span>` : `<span class="kbd">E</span><span>앉기</span>`;
@@ -30,7 +32,7 @@ export class Seating {
     // 착석 중 "풀스크린으로 보기" 버튼 (P3-4)
     this.fsBtn = document.createElement('button');
     this.fsBtn.className = 'zoom-prompt no-cam-drag';
-    this.fsBtn.style.cssText = 'display:none;bottom:88px';
+    this.fsBtn.style.cssText = 'display:none;bottom:calc(150px + env(safe-area-inset-bottom, 0px))';
     this.fsBtn.innerHTML = `<span>⛶ 풀스크린으로 보기</span>`;
     this.fsBtn.addEventListener('click', (e) => { e.stopPropagation(); this.openPlayer(); });
     root.appendChild(this.fsBtn);

@@ -275,3 +275,35 @@
 - [x] 유영 포즈: 엎드려 날기(+1.2/+0.6), 머리=진행 방향, FLOAT_ACC 8 — 검증: headVsMoveDiff 0.00, 0.74m/s
 - [x] 미디어 소리: 방 입장 시에만 재생(방 게이팅) + 플레이어 볼륨 슬라이더(mp-vol, userVol)
 - [x] seasea: 뭉게구름·태양 윤슬 길·갈매기 / ocean: 코스틱스 2겹·해초 잎·바위·물고기 떼 — 스크린샷 검증
+
+---
+
+# v1.8 자연스러움·품질 개선 패치 (2026-07-26) ✅ 전 항목 완료
+
+사용자 요청: "미술관/캐릭터 질감·디자인을 자연스럽고 퀄리티 좋게, 모바일 플레이 어색함, 미디어 관 소리가 방 밖에서 들리는 문제 점검·개선".
+착수 전 실측으로 확인한 근거는 context-notes.md v1.8 절 참조.
+
+## A. 미디어 룸 오디오 게이팅 (버그)
+- [x] A1. world.js buildScreen: video 생성 시 `muted=true; volume=0` 로 시작 (자동재생 정책과도 정합)
+- [x] A2. 게이팅 기준을 volume → **muted** 로 전환 (iOS Safari 는 volume setter 가 no-op)
+- [x] A3. 게이팅 로직을 `applyScreenAudio()` 단일 함수로 분리 — animate 루프 + setPaused + visibilitychange 에서 호출
+- [x] A4. `if (muted) continue` 제거 (상태를 항상 재계산)
+- [x] A5. 방 경계에서 소리가 툭 켜지지 않도록 볼륨 페이드(약 0.3s)
+- [x] A6. 부팅~animate 시작 사이(실측 3.1~3.9s) 무음 보장
+- [x] 검증: 로비/각 방/미디어룸에서 muted·volume 실측, 탭 백그라운드·프리뷰 일시정지 시 무음
+
+## B. 모바일 조작
+- [x] B1. 터치 판정 분리: `isMobile`(렌더 프로파일) vs `isTouch`(입력 UI). isTouch = coarse pointer || maxTouchPoints>0 → iPadOS 13+ 포함
+- [x] B2. 조이스틱을 isTouch 기준으로 생성 (현재 iPad 는 이동 불가)
+- [x] B3. `.joy-zone` 이 하단 중앙 프롬프트를 덮지 않도록 영역·z-index 조정
+- [x] B4. `.zoom-prompt` 등 하단 UI safe-area inset 적용
+- [x] 검증: 375×812 / 768×1024 뷰포트에서 프롬프트 탭 가능 여부, 조이스틱 표시
+
+## C. 그래픽 품질
+- [x] C1. 접지 그림자(contact shadow) — 아바타·벤치 아래 소프트 블롭 (실내에 그림자 광원이 없어 전부 떠 보이는 문제)
+- [x] C2. 아바타 방 밝기 연동 — 현재 방 roomDim 을 아바타 재질에 반영 (미디어룸에서 아바타만 형광으로 뜨는 문제)
+- [x] C3. 벽·바닥 텍스처 anisotropy + 밉맵 설정 (원거리 지글거림)
+- [x] C4. 미디어룸: 스크린 발광 라이트 + 방 최소 밝기 바닥 (사용자 선택: "최소 밝기 + 스크린 발광")
+- [x] C5. 바닥 헤링본/플랭크 텍스처 결 개선
+- [x] C6. (조사 결과 변경 없음) 실내에는 그림자 캐스팅 광원이 도달하지 않아 필터 변경이 무의미 — 대신 접지 그림자(C1)로 해결. 상세는 context-notes 참조
+- [x] 검증: 로비/갤러리/미디어룸 before-after 캡처 비교

@@ -9,7 +9,7 @@
 // 경계마다 벽을 딱 한 번만 생성 → 공유벽 이중생성/ z-fighting 없음. 문은 구멍으로 뺀다.
 import * as THREE from '../../vendor/three.module.js';
 import { LAYOUT, wallLeftToWorld, wallLength, wallFaceStyle, doorCovered, doorHiddenSide, findOppositeFace, generateBenches, textBlocks } from '../../shared/schema.js';
-import { wallStyleTexture, floorStyleTexture, styledTextTexture, WALL_COLORS } from './textures.js';
+import { wallStyleTexture, floorStyleTexture, styledTextTexture, contactShadowMesh, WALL_COLORS } from './textures.js';
 import { makeSpotlight } from './artwork.js';
 
 const T = LAYOUT.WALL_THICK;
@@ -20,7 +20,7 @@ const MOOD_COLOR = { warm: 0xffd9a8, neutral: 0xfff4e6, cool: 0xdfe9ff };
 // F2(v1.7): lightIntensity(0~2) → 방 표면 감쇠 팩터.
 // 전역 조명(hemi/amb/key)은 방별로 끌 수 없으므로, 벽·바닥·천장 머티리얼 색을
 // 낮춰 "방 전체가 어두워지는" 효과를 낸다. 1.0 이상 = 감쇠 없음(포인트라이트가 밝기 담당).
-function roomDim(cst) {
+export function roomDim(cst) {
   const li = cst?.lightIntensity ?? 1;
   return Math.max(0.16, Math.min(1, 0.2 + 0.8 * li));
 }
@@ -235,7 +235,7 @@ export function buildWorld(scene, project, layout, patternImages = {}, videoUrls
     if (r.isLobby || !r.room) continue;
     if ((r.room.roomType || 'gallery') !== 'media' || !r.room.screen) continue;
     const sc = buildScreen(group, r.rect, r.room, videoUrls);
-    if (sc) screens.push({ ...sc, roomId: r.id });
+    if (sc) screens.push({ ...sc, roomId: r.id, roomIndex: r.index });
   }
 
   // ---- 벤치 ----
@@ -276,6 +276,8 @@ export function buildWorld(scene, project, layout, patternImages = {}, videoUrls
     group.add(pl);
     moodLights.push({ light: pl, roomIndex: r.isLobby ? -1 : r.index });
   }
+  // v1.8: 스크린 발광도 방 조명과 같은 라이프사이클 — 모바일 라이트 매니저가 방 단위로 켜고 끈다.
+  for (const sc of screens) if (sc.glow) moodLights.push({ light: sc.glow, roomIndex: sc.roomIndex });
 
   // ---- 그랜드 로비 데코 (P3 — 전부 절차 생성, 토글) ----
   buildLobbyDecor(group, colliders, rects[0], project, openings);
@@ -299,6 +301,7 @@ function addBenchAt(group, colliders, a, x, z, yaw) {
   const g = new THREE.Group();
   const seat = new THREE.Mesh(a.seatGeo, a.seatMat); seat.position.y = 0.45; seat.castShadow = true; g.add(seat);
   for (const dx of [-0.7, 0.7]) { const leg = new THREE.Mesh(a.legGeo, a.legMat); leg.position.set(dx, 0.225, 0); g.add(leg); }
+  const sh = contactShadowMesh(1); sh.scale.set(2.1, 0.95, 1); sh.position.y = 0.015; g.add(sh); // v1.8 접지 그림자
   g.position.set(x, 0, z); g.rotation.y = yaw;
   group.add(g);
   // 회전 반영 AABB (seat 로컬 1.6×0.5). low=낮은 가구 — 카메라 충돌(F4 착석 측면뷰)에서 제외
@@ -335,38 +338,44 @@ function buildScreen(group, rect, room, videoUrls = {}) {
   panel.userData.screen = true;
   group.add(panel);
   // P3-3: 업로드 영상 → VideoTexture (무광 = 스크린 자체 발광 느낌)
-  // F1(v1.7): 소리와 함께 자동재생 시도 → 브라우저가 차단하면 음소거로 시작하고
-  // 첫 사용자 제스처(클릭/키)에서 소리를 켠다. 볼륨 거리 감쇠는 main.js animate 담당.
-  let video = null;
+  // v1.8: 영상은 **항상 음소거로 시작**한다. 소리를 켜는 시점은 main.js 의
+  // applyScreenAudio(방 게이팅)가 단독으로 결정한다. 여기서 소리를 켜면
+  // 월드 빌드 직후부터 animate 첫 프레임까지(실측 3초대) 로딩 화면에서 소리가 샌다.
+  let video = null, glow = null;
   if (s.source === 'upload' && s.file && videoUrls[s.file]) {
     video = document.createElement('video');
     video.src = videoUrls[s.file];
     video.loop = true; video.crossOrigin = 'anonymous';
+    video.muted = true; video.volume = 0;
     video.playsInline = true; video.setAttribute('playsinline', ''); video.setAttribute('webkit-playsinline', '');
-    if (s.autoplay !== false) autoplayWithSound(video);
+    if (s.autoplay !== false) ensurePlayback(video);
     const vtex = new THREE.VideoTexture(video);
     vtex.colorSpace = THREE.SRGBColorSpace;
     panel.material.map = vtex; panel.material.color.set('#ffffff'); panel.material.needsUpdate = true;
+    // v1.8: 스크린 발광 — 어두운 미디어룸에서 화면 빛이 좌석·바닥에 떨어지는 영화관 느낌.
+    // (방 조명 lightIntensity 가 0이어도 최소한의 밝기를 확보하는 역할도 겸한다)
+    // 도달 범위를 넓게 잡으면 천장에 스포트라이트처럼 고여 조명기구처럼 보인다.
+    // 좌석·바닥 쪽으로 떨어지도록 스크린 중심보다 살짝 낮게, 범위는 짧게.
+    glow = new THREE.PointLight(0xc8daff, Math.min(6, 1.8 + w * 0.7), Math.max(8, w * 2.0), 1.8);
+    glow.position.set(at.x + nx * (off + w * 0.35), cy - 0.3, at.z + nz * (off + w * 0.35));
+    group.add(glow);
   }
-  return { panel, room, center: { x: at.x, y: cy, z: at.z }, wall, w, h, video };
+  return { panel, room, center: { x: at.x, y: cy, z: at.z }, wall, w, h, video, glow };
 }
 
-// F1(v1.7): 소리 포함 자동재생. 차단되면 음소거 재생 후 첫 제스처에서 소리 복구.
-function autoplayWithSound(video) {
-  video.muted = false;
+// 음소거 자동재생. 차단되면 첫 사용자 제스처에서 한 번 더 시도한다.
+// (소리를 켜는 건 여기 책임이 아니다 — main.js applyScreenAudio 참조)
+function ensurePlayback(video) {
   const p = video.play?.();
   if (!p || !p.catch) return;
   p.catch(() => {
-    video.muted = true;
-    video.play?.().catch(() => {});
-    const unlock = () => {
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('keydown', unlock);
-      video.muted = false;
+    const retry = () => {
+      window.removeEventListener('pointerdown', retry);
+      window.removeEventListener('keydown', retry);
       video.play?.().catch(() => {});
     };
-    window.addEventListener('pointerdown', unlock);
-    window.addEventListener('keydown', unlock);
+    window.addEventListener('pointerdown', retry);
+    window.addEventListener('keydown', retry);
   });
 }
 
@@ -535,6 +544,7 @@ function addBench(group, colliders, cx, cz) {
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.45, 0.44), legMat);
     leg.position.set(dx, 0.225, 0); g.add(leg);
   }
+  const sh = contactShadowMesh(1); sh.scale.set(2.1, 0.95, 1); sh.position.y = 0.015; g.add(sh); // v1.8 접지 그림자
   g.position.set(cx, 0, cz);
   group.add(g);
   colliders.push({ minX: cx - 0.8, maxX: cx + 0.8, minZ: cz - 0.25, maxZ: cz + 0.25, low: true });

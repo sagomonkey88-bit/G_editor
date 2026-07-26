@@ -19,10 +19,47 @@ export const FLOOR_COLORS = {
 
 const _cache = new Map();
 
+// v1.8: 벽/바닥은 넓은 면에 타일링되어 시선이 스칠 때 심하게 지글거린다(모아레).
+// 이방성 필터링 값. GPU 최대치를 넘으면 THREE 가 업로드 시 클램프한다.
+const SURFACE_ANISO = 8;
+
 function canvas(size) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   return c;
+}
+
+// v1.8: 접지 그림자 블롭.
+// 실내에는 그림자를 만드는 광원이 없다 — 유일한 castShadow 광원인 DirectionalLight 는
+// 천장·벽에 막히고 방별 PointLight 는 그림자를 만들지 않는다. 그래서 캐릭터·가구가
+// 바닥에서 떠 보인다. 실광원을 늘리는 대신(모바일 비용) 라디얼 그라디언트 평면으로
+// 접지감만 회복한다.
+let _blobTex = null;
+function contactShadowTexture() {
+  if (_blobTex) return _blobTex;
+  const S = 128;
+  const cv = canvas(S), g = cv.getContext('2d');
+  // 감쇠가 좁으면 캐릭터 몸통(반경 ≈0.37m)에 통째로 가려져 아무것도 안 보인다.
+  // 중심은 짙게, 몸통 바깥(반경 0.4~0.6m)까지 알아볼 수 있는 농도가 남도록 넓게 편다.
+  const gr = g.createRadialGradient(S / 2, S / 2, 2, S / 2, S / 2, S / 2 - 2);
+  gr.addColorStop(0, 'rgba(0,0,0,0.55)');
+  gr.addColorStop(0.5, 'rgba(0,0,0,0.40)');
+  gr.addColorStop(0.8, 'rgba(0,0,0,0.14)');
+  gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, S, S);
+  _blobTex = new THREE.CanvasTexture(cv);
+  return _blobTex;
+}
+
+// 바닥에 눕혀진(XZ 평면) 원형 그림자 메시. 호출자가 위치/스케일을 잡는다.
+export function contactShadowMesh(size = 1) {
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(size, size),
+    new THREE.MeshBasicMaterial({ map: contactShadowTexture(), transparent: true, depthWrite: false })
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.renderOrder = -1;
+  return m;
 }
 
 // 벽지: 베이스 색 + (옵션) 다마스크풍 모티프 -------------------------------
@@ -69,6 +106,7 @@ export function wallTexture(preset = 'deep-red', pattern = true) {
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = SURFACE_ANISO;
   _cache.set(key, tex);
   return tex;
 }
@@ -82,17 +120,37 @@ export function floorTexture(preset = 'walnut-herringbone') {
   const cv = canvas(S), g = cv.getContext('2d');
   g.fillStyle = pal.grain; g.fillRect(0, 0, S, S);
 
+  // v1.8: 판자마다 사방 테두리를 두르면 나무가 아니라 블록 격자로 보인다.
+  // 이음매는 두 변만 얇게 긋고, 판자별 색조 편차 + 굽은 나뭇결로 나무 느낌을 낸다.
+  // 난수는 결정적(seeded) — 텍스처가 매번 같아야 캐시·검증이 안정적이다.
+  const rnd = (i) => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  let pIdx = 0;
   const plank = (x, y, w, h, col) => {
+    const i = pIdx++;
     g.save(); g.translate(x, y);
     g.fillStyle = col; g.fillRect(0, 0, w, h);
-    // 나뭇결 라인
-    g.strokeStyle = 'rgba(0,0,0,0.12)'; g.lineWidth = 1;
-    for (let i = 0; i < 3; i++) {
+    // 판자별 톤 편차. 세게 주면 512px 타일이 통째로 반복되는 게 오히려 눈에 띈다 — 아주 약하게.
+    g.globalAlpha = 0.02 + rnd(i) * 0.045;
+    g.fillStyle = rnd(i + 7) > 0.5 ? '#ffffff' : '#000000';
+    g.fillRect(0, 0, w, h);
+    g.globalAlpha = 1;
+    // 나뭇결: 얇고 흐린 곡선 4줄
+    g.lineWidth = 1;
+    for (let k = 0; k < 4; k++) {
+      const r = rnd(i * 13 + k);
+      g.strokeStyle = `rgba(0,0,0,${(0.05 + r * 0.07).toFixed(3)})`;
+      const yy = h * (k + 0.5 + (r - 0.5) * 0.6) / 4;
       g.beginPath();
-      const yy = (h / 4) * (i + 1);
-      g.moveTo(2, yy); g.lineTo(w - 2, yy + (i % 2 ? 1 : -1)); g.stroke();
+      g.moveTo(1, yy);
+      g.quadraticCurveTo(w / 2, yy + (r - 0.5) * h * 0.2, w - 1, yy + (r - 0.5) * 1.5);
+      g.stroke();
     }
-    g.strokeStyle = 'rgba(0,0,0,0.25)'; g.strokeRect(0.5, 0.5, w - 1, h - 1);
+    // 이음매 (좌변 + 아랫변만)
+    g.strokeStyle = 'rgba(0,0,0,0.20)'; g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(0.5, 0); g.lineTo(0.5, h);
+    g.moveTo(0, h - 0.5); g.lineTo(w, h - 0.5);
+    g.stroke();
     g.restore();
   };
 
@@ -125,6 +183,7 @@ export function floorTexture(preset = 'walnut-herringbone') {
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = SURFACE_ANISO;
   _cache.set(key, tex);
   return tex;
 }
@@ -231,6 +290,7 @@ export function wallStyleTexture(style, imageEl) {
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = style.patternMirror ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping;
+  tex.anisotropy = SURFACE_ANISO;
   const out = { tex, tileM };
   _cache.set(key, out);
   return out;
@@ -257,6 +317,7 @@ export function floorStyleTexture(floorDef, imageEl) {
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = SURFACE_ANISO;
     const out = { tex, tileM: 2 };
     _cache.set(key, out);
     return out;
@@ -270,6 +331,7 @@ export function floorStyleTexture(floorDef, imageEl) {
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = tex.wrapT = floorDef.mirror ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping;
+    tex.anisotropy = SURFACE_ANISO;
     const out = { tex, tileM: floorDef.scale || 1 };
     _cache.set(key, out);
     return out;

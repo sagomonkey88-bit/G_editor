@@ -47,8 +47,10 @@ canvas#scene { display: block; width: 100%; height: 100%; }
 #hud > * { pointer-events: auto; }
 
 /* 근접 프롬프트 */
+/* z-index: 조이스틱 존(60)보다 위 — 아니면 하단 중앙에서 탭이 조이스틱에 먹힌다 (v1.8) */
 .zoom-prompt {
-  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  z-index: 70;
   display: flex; align-items: center; gap: 10px;
   background: rgba(24,18,14,.82); color: #f0e4cc; border: 1px solid rgba(201,162,76,.55);
   padding: 11px 20px; border-radius: 999px; font-size: 15px; font-weight: 600;
@@ -173,11 +175,16 @@ canvas#scene { display: block; width: 100%; height: 100%; }
 .ingame-hint b { color: #f0d080; }
 
 /* 모바일 조이스틱 */
-.joy-zone { position: fixed; left: 0; bottom: 0; width: 45vw; height: 45vh; z-index: 60; }
+/* v1.8: 좌하단만 덮도록 폭·높이를 제한한다. 예전 45vw×45vh 는 화면 하단 중앙까지 침범해
+   "앉기"·"자세히 보기" 프롬프트 탭을 가로챘다. (프롬프트는 z-index 70 으로 한 번 더 방어) */
+.joy-zone {
+  position: fixed; left: 0; bottom: 0; z-index: 60;
+  width: min(46vw, 300px); height: min(42vh, 340px);
+}
 .joy-base {
   position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
   background: rgba(255,255,255,.08); border: 1.5px solid rgba(255,255,255,.22); opacity: .5;
-  left: 100px; top: calc(100% - 110px);
+  left: 100px; top: calc(100% - 110px - env(safe-area-inset-bottom, 0px));
 }
 .joy-knob {
   position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px;

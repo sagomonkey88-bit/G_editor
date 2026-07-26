@@ -210,3 +210,58 @@ Opus 4.8 이 구현한 v1.6 에 대한 사용자 실사용 피드백 12건(F1~F1
 - **seasea 추가 개선**: cloudTexture(블롭 합성 뭉게구름), 태양 방향 윤슬 길(glitter path 포인트), 갈매기 실루엣 4마리.
 - **ocean 추가 개선**: causticsTexture 2겹 스크롤(repeat 26 — 7이면 링이 거대해짐 주의), leafTexture 해초 12(뿌리 피벗 sway), 바위 7, 물고기 떼 3무리×8(공유 머티리얼) + 단독 7.
 - 절차적 생성 한계 도달 — 더 높은 퀄리티는 에셋 필요(스카이 파노라마, water normal, GLB 물고기, 앰비언트 사운드). 사용자에게 스펙 안내함. 에셋 수급 시 finale 에 프리셋별 에셋 슬롯(assets: { sky, waterNormal, ... }) 설계 필요.
+
+---
+
+# v1.8 자연스러움·품질 개선 컨텍스트 노트 (2026-07-26)
+
+## 착수 전 실측 (추측 아님 — 근거 기록)
+검증 환경: `node _devserver.mjs`(8777) + `/viewer/index.html`(viewer/data 퍼블리시 테스트본, 미디어룸 1개 + 42MB mp4).
+브라우저 패널은 rAF 가 스로틀되므로 `controls.update` 수동 N회 + `renderer.render` + `toDataURL` → `POST /__capture` 로 캡처.
+
+- **부팅 소요 ≈ 3.1~3.9초** (같은 출처 iframe 으로 `__museum` 노출 시점 샘플링). `buildWorld`(=영상 `play()` 호출) 와 `animate()`(=볼륨 0 세팅) 사이가 그만큼 벌어져 있다.
+- 데스크톱 Chrome 은 **비음소거 자동재생이 허용됨**(`muted:false, paused:false` 실측). 즉 F1 의 "차단되면 음소거" 폴백은 데스크톱에선 타지 않고, 볼륨 1로 재생되다가 첫 animate 프레임에서 0이 된다.
+- 미디어룸 데이터: `ceiling.lightIntensity = 0` → `roomDim = 0.2`, 방 포인트라이트 세기 `amb*9*0 = 0`. **방에 지역 광원이 아예 없다** → 캡처상 거의 칠흑.
+- 실내에는 **그림자를 만드는 광원이 없다**. 유일한 `castShadow` 광원인 DirectionalLight(6,14,8)는 천장/벽에 막히고, 방별 PointLight 는 `castShadow` 미설정. 아바타는 `castShadow=true`(avatar.js:628) 지만 받을 광원이 없어 접지 그림자가 0 → 캐릭터·벤치가 바닥에서 떠 보인다.
+
+## 핵심 결정
+
+### A. 오디오 게이팅을 volume → muted 로 전환 (가장 중요)
+- **근거**: iOS Safari 는 `HTMLMediaElement.volume` setter 가 no-op (오디오 볼륨은 기기 물리 버튼만). v1.7.1 게이팅이 전부 `volume` 기반이라 **아이폰/아이패드에서는 방 게이팅·거리 감쇠가 통째로 무효**였다. 사용자 증상("입구에서부터 소리")과 정합.
+- `muted` 는 전 플랫폼에서 동작하므로 **"들리는가/안 들리는가"는 muted 로, "얼마나 크게"는 volume 으로** 이원화한다. volume 이 무시되는 iOS 에서도 방 밖 무음은 보장된다.
+- `video` 는 `muted=true, volume=0` 으로 생성한다. 자동재생 정책상으로도 음소거 시작이 안전하고, 부팅~animate 공백(3초대)에 소리가 새지 않는다.
+- 기존 `if (sc.video.muted) continue` 는 **제거**. 음소거는 이제 정상 상태이므로 스킵 조건이 되면 안 된다.
+- 게이팅을 `animate()` 안에 인라인으로 두면 rAF 가 멈추는 순간(탭 백그라운드, 프리뷰 `setPaused`) 마지막 상태로 고정된다 → `applyScreenAudio()` 로 분리해 일시정지·visibilitychange 에서도 강제 무음.
+
+### B. isMobile 과 isTouch 분리
+- 기존 `isMobile` 하나가 **렌더 품질 프로파일**(antialias/pixelRatio/그림자/라이트매니저)과 **입력 UI**(조이스틱) 두 역할을 겸했다. UA 문자열 기반이라 iPadOS 13+ (UA=Macintosh) 가 미검출 → 조이스틱 없음 → 키보드도 없으니 **이동 수단이 0**.
+- `isTouch = (pointer:coarse) || maxTouchPoints>0` 로 입력 UI 만 분리 판정. 렌더 프로파일은 기존 UA 판정 유지(터치 노트북까지 저품질로 떨어뜨릴 이유가 없음).
+
+### C. 접지 그림자 = 실광원이 아니라 블롭
+- 방마다 그림자 캐스팅 광원을 켜는 건 모바일에서 비용이 크고(섀도맵 N장), 기존 라이트매니저 구조와도 충돌. 대신 캐릭터 선택 화면에서 이미 쓰는 **라디얼 그라디언트 블롭**(hud.js radialTexture)과 같은 방식을 인게임에 적용 — 비용 사실상 0, 접지감은 대부분 회복.
+
+### D. 아바타 밝기 = 방 dim 을 재질 색에 곱함
+- 벽/바닥은 빌드 시점에 `roomDim` 이 구워지지만 아바타는 이동하므로 런타임 반영이 필요. `avatar.userData.setDim(k)` 를 추가해 재질 키트의 기본색 × k 로 갱신, main.js animate 의 `currentRoomIndex` 결과를 재사용(추가 연산 없음).
+
+## 구현 중 확인·수정 사항 (검증 로그)
+
+- **접지 그림자가 안 보이던 원인 = 감쇠 폭**. 처음 그라디언트를 "중심 짙게, 가장자리 급하게"로 잡았더니 알아볼 수 있는 농도가 반경 0.3m 안에만 남아 캐릭터 몸통(반경 ≈0.37m)에 통째로 가려졌다. 벤치(2.1×0.95m)는 잘 보이는데 아바타만 안 보여 한참 헤맸다. 최종값: 알파 스톱 0/0.5/0.8/1 = 0.55/0.40/0.14/0, 아바타 평면 1.4m.
+  - 디버깅 중 `material.transparent = false` 로 바꿔 확인하려던 게 오히려 혼선을 키웠다 — `depthWrite:false` + `renderOrder:-1` 조합이라 불투명으로 만들면 **불투명 패스 맨 앞에 그려진 뒤 바닥이 덮어쓴다**. 이 재질은 transparent 상태로만 검증해야 한다.
+- **부유(피날레) 모드에서는 그림자를 숨긴다**(`pose === 'float'`). 우주·하늘·바다속 프리셋에는 바닥이 없어 y=0.02 의 원반이 공중에 뜬 검은 판으로 보인다.
+- **바닥 판자 톤 편차는 아주 약하게**(알파 0.02~0.065). 처음 0.05~0.15 로 줬더니 512px 타일이 통째로 반복되는 게 오히려 도드라져 얼룩 격자처럼 보였다. 세게 줄수록 좋아지지 않는다.
+- **스크린 발광 도달 범위**를 넓게(거리 w×3.4) 잡으면 천장에 스포트라이트처럼 고여 조명기구처럼 보인다. w×2.0 · decay 1.8 · 스크린 중심보다 0.3m 아래로 낮춰야 좌석·바닥으로 떨어진다.
+- **볼륨 페이드는 비대칭**(들어올 때 0.35s / 나갈 때 0.15s) + 0.004 미만은 0으로 스냅. 대칭 지수 감쇠는 0에 닿지 않아 방을 나가고도 1.4초쯤 소리가 끌렸다(실측).
+- **`dt === 0` 은 falsy** — `state?.dt ? … : 1` 로 쓰면 "시간이 안 흘렀다"가 "즉시 반영"으로 뒤집힌다. `state?.dt == null` 로 판정해야 한다.
+- **C6(그림자 필터/톤매핑)은 변경하지 않았다.** 모든 공간이 천장으로 막혀 있어 유일한 castShadow 광원(DirectionalLight)의 그림자가 실내에 도달하지 않는다 → PCFSoft 로 바꿔도 화면상 차이가 0. 참고로 이 섀도맵(2048², 데스크톱만)은 현재 **시각 효과 없이 매 프레임 렌더되는 비용**이다. 제거하면 데스크톱 성능 이득이 있으나 이번 범위 밖으로 남겨 둔다(피날레 등 다른 씬 영향 확인 필요).
+
+## 검증 방법 메모 (다음 세션용)
+브라우저 패널 탭은 `document.hidden === true` 라 **rAF 가 아예 안 돈다**(스로틀이 아니라 정지). 실측 확인함.
+게이팅·페이드처럼 animate 루프 안에 있는 로직을 검증하려면 rAF 를 가로채 animate 함수를 붙잡는다.
+```js
+var captured=null;
+window.requestAnimationFrame = function(cb){ captured=cb; return 0; };
+m.setPaused(true); m.setPaused(false);        // animate() 를 동기 실행 → 자기 자신을 rAF 에 등록
+window.requestAnimationFrame = function(){ return 0; };
+// 이제 captured() 를 실제 시간 간격(setTimeout 16ms)을 두고 반복 호출하면 dt 가 정상으로 흐른다
+```
+`setPaused(true)` 는 강제 무음을 유발하므로 **페이드 검증 중에는 토글을 반복하면 안 된다**(매번 0으로 리셋됨).

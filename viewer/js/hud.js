@@ -11,7 +11,8 @@ export class HUD {
   constructor(project, opts = {}) {
     this.project = project;
     this.onEnter = opts.onEnter || (() => {});
-    this.isMobile = opts.isMobile;
+    this.isMobile = opts.isMobile;      // 렌더 품질 프로파일 (UA 기반)
+    this.isTouch = opts.isTouch ?? opts.isMobile; // 입력 UI 판정 (조이스틱·조작 안내)
     this.controls = null;            // enter 후 주입
     this.hudHidden = false;
     this.clockOn = false;
@@ -87,10 +88,10 @@ export class HUD {
     const camera = new THREE.PerspectiveCamera(38, 2, 0.1, 30);
     this._csScene = scene; this._csCamera = camera; // 디버그/검증용 참조
 
-    // 아바타 4체 + 섀도 블롭 + 이름 라벨
+    // 아바타 4체 + 이름 라벨 (발밑 그림자는 아바타에 내장)
     const X = [-2.05, -0.7, 0.7, 2.05];
     this._csAvatars = {};
-    const blobTex = radialTexture('rgba(0,0,0,0.34)', 'rgba(0,0,0,0)');
+    // v1.8: 발밑 섀도 블롭은 makeAvatar 가 직접 달고 나온다(인게임과 동일) — 여기서 또 깔면 겹쳐 진해진다.
     const glowTex = radialTexture('rgba(255,214,150,0.55)', 'rgba(255,214,150,0)');
     this._csGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     this._csGlow.scale.set(2.4, 2.4, 1);
@@ -102,16 +103,12 @@ export class HUD {
       scene.add(av);
       // 재질 기본색 보존(딤 처리용)
       av.traverse(o => { if (o.isMesh && o.material?.color) o.material.userData = { base: o.material.color.clone() }; });
-      const blob = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.5), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false }));
-      blob.rotation.x = -Math.PI / 2;
-      blob.position.set(X[i], 0.012, 0.1);
-      scene.add(blob);
 
       const label = document.createElement('div');
       label.className = 'cs-name';
       label.textContent = AVATAR_PRESETS[keyName].displayName;
       labels.appendChild(label);
-      this._csAvatars[keyName] = { av, label, blob, x: X[i] };
+      this._csAvatars[keyName] = { av, label, x: X[i] };
     });
 
     // 선택/스와이프 입력
@@ -159,7 +156,6 @@ export class HUD {
         const rec = this._csAvatars[k];
         rec.x = X[i] * f;
         rec.av.position.x = rec.x;
-        if (rec.blob) rec.blob.position.x = rec.x;
       });
       const halfExtent = 2.05 * f + 0.75; // 라인업 좌우 끝 + 여백
       const dist = Math.max(4.9, halfExtent / (Math.tan((38 / 2) * Math.PI / 180) * camera.aspect));
@@ -279,8 +275,7 @@ export class HUD {
   }
 
   _showHelp(onStart) {
-    const touch = this.isMobile || (navigator.maxTouchPoints || 0) > 0 && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-    const rows = touch
+    const rows = this.isTouch
       ? [['조이스틱', '이동'], ['화면 드래그', '시점 회전 (상하 포함)'], ['두 손가락 핀치', '카메라 거리 줌'], ['프롬프트 탭', '작품 자세히 보기'], ['🗺 방 이동 버튼', '원하는 방으로 순간이동'], ['닫기 버튼', '돌아가기']]
       : [['WASD / ←↑↓→', '이동'], ['Shift', '달리기'], ['마우스 드래그', '시점 회전 (상하 포함)'], ['휠', '카메라 거리 줌'], ['E', '작품 자세히 보기'], ['M', '방 이동 메뉴'], ['ESC', '닫기'],
          ['H', '화면 UI 숨기기(녹화용)'], ['T', '시계 표시'], ['P', '자동 도슨트 워크']];
@@ -321,13 +316,16 @@ export class HUD {
     const hud = document.getElementById('hud');
     const hint = document.createElement('div');
     hint.className = 'ingame-hint';
-    hint.innerHTML = this.isMobile
+    hint.innerHTML = this.isTouch
       ? `왼쪽 조이스틱으로 이동 · 화면 드래그로 시점 · 핀치로 줌`
       : `<b>WASD</b> 이동 · <b>드래그</b> 시점 · <b>휠</b> 줌 · <b>E</b> 자세히 · <b>M</b> 방이동 · <b>H</b> UI숨김`;
     hud.appendChild(hint);
     this.hint = hint;
 
-    if (this.isMobile) this._buildJoystick(hud);
+    // v1.8: UA 가 아니라 터치 판정으로 조이스틱을 만든다.
+    // iPadOS 13+ 는 UA 가 Macintosh 라 UA 판정으로는 조이스틱이 안 생기고,
+    // 키보드도 없으니 이동 수단이 아예 사라졌다.
+    if (this.isTouch) this._buildJoystick(hud);
 
     const clock = document.createElement('div');
     clock.className = 'clock-overlay';

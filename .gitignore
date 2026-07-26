@@ -18,3 +18,4 @@ node_modules/
 _devserver.mjs
 # 검증 스크린샷 (소스 아님)
 docs/comparisons/
+_cap_*.png

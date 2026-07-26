@@ -10,6 +10,7 @@ import {
   AVATAR_PRESETS, DEFAULT_PRESET, LEGACY_PRESET_MAP,
   GARMENT_PALETTE, EYE_COLOR, LINE_COLOR,
 } from './avatarPresets.js';
+import { contactShadowMesh } from './textures.js';
 
 export { GARMENT_PALETTE };
 
@@ -38,7 +39,12 @@ function unitSphere(hi = true) {
 // ---- 재질 키트: 역할별 1인스턴스 공유 (§3.2) -------------------------------
 // 의상 색·몸 변형 변경 시 해당 역할 재질의 color 만 갱신하면 전 부위에 반영된다.
 function makeKit(bodySet, garmentHex) {
-  const mk = (hex) => new THREE.MeshToonMaterial({ color: new THREE.Color(hex), gradientMap: toonGradient() });
+  // userData.base = 감쇠 전 원본색. v1.8 setDim(방 밝기 연동)이 이 값을 기준으로 곱한다.
+  const mk = (hex) => {
+    const m = new THREE.MeshToonMaterial({ color: new THREE.Color(hex), gradientMap: toonGradient() });
+    m.userData.base = m.color.clone();
+    return m;
+  };
   const mats = { garment: mk(garmentHex), eye: mk(EYE_COLOR) };
   for (const [role, hex] of Object.entries(bodySet)) mats[role] = mk(hex);
   return mats;
@@ -626,14 +632,47 @@ export function makeAvatar(opts = {}) {
   const parts = builder(rig, mats, preset.parts);
 
   root.traverse(o => { if (o.isMesh) o.castShadow = true; });
-  root.userData.update = makeUpdater(rig, parts);
+
+  // v1.8: 접지 그림자 — 실내에 그림자 광원이 없어 캐릭터가 바닥에서 떠 보이던 문제.
+  // 몸통 지름(≈0.75m)보다 넉넉히 커야 그림자가 몸에 가려지지 않고 발밑으로 삐져나온다.
+  const shadow = contactShadowMesh(1.4);
+  shadow.castShadow = false;
+  root.add(shadow);
+
+  // v1.8: 방 밝기(roomDim) 연동. 벽·바닥은 빌드 시점에 감쇠가 구워지지만 아바타는
+  // 방을 옮겨 다니므로 런타임에 재질 색을 갱신해야 한다(어두운 미디어룸에서
+  // 아바타만 형광으로 떠 보이던 문제).
+  let dim = 1;
+  const applyDim = () => { for (const m of Object.values(mats)) m.color.copy(m.userData.base).multiplyScalar(dim); };
+
+  const baseUpdate = makeUpdater(rig, parts);
+  root.userData.update = (dt, moving, speed01, pose) => {
+    baseUpdate(dt, moving, speed01, pose);
+    // 피날레 부유는 바닥이 없는 씬(우주·하늘·바다속) — 접지 그림자가 공중의 검은 원반이 된다.
+    shadow.visible = pose !== 'float';
+    if (shadow.visible) {
+      // 착석 등으로 root 가 떠오르면 그림자는 바닥에 남기고 크게·흐리게.
+      const h = Math.max(0, root.position.y);
+      shadow.position.y = 0.02 - h;
+      const s = 1 + Math.min(h, 2.5) * 0.3;
+      shadow.scale.set(s, s, 1);
+      shadow.material.opacity = Math.max(0, 1 - h * 0.4) * dim;
+    }
+  };
   root.userData.preset = key;
   root.userData.parts = parts;
-  root.userData.setGarment = (hex) => { mats.garment.color.set(hex); };
+  root.userData.setGarment = (hex) => { mats.garment.userData.base.set(hex); applyDim(); };
   root.userData.setBody = (k) => {
     const set = preset.bodies[k];
     if (!set) return;
-    for (const [role, hex] of Object.entries(set)) if (mats[role]) mats[role].color.set(hex);
+    for (const [role, hex] of Object.entries(set)) if (mats[role]) mats[role].userData.base.set(hex);
+    applyDim();
+  };
+  // k = world.js roomDim() 과 같은 0.16~1 범위
+  root.userData.setDim = (k) => {
+    const v = Math.max(0.16, Math.min(1, k));
+    if (Math.abs(v - dim) < 0.01) return;
+    dim = v; applyDim();
   };
   // §3.1 충돌 캡슐·카메라 타깃 (controls.js 가 참조 가능)
   root.userData.collision = { radius: 0.40, height: 1.30, camTargetY: 1.0 };

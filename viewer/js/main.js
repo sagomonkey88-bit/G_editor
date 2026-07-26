@@ -1,7 +1,7 @@
 // viewer/js/main.js — 뷰어 진입점: 데이터 로드 → 월드 빌드 → 렌더 루프.
 import * as THREE from '../../vendor/three.module.js';
 import { computeLayout, validateProject, ensureLobby, ensureTextStyles, normalizeSurfaces, ensureOrigins, ensureTexts, ensureArtMeta } from '../../shared/schema.js';
-import { buildWorld } from './world.js';
+import { buildWorld, roomDim } from './world.js';
 import { buildArtworks } from './artwork.js';
 import { makeAvatar } from './avatar.js';
 import { PlayerControls } from './controls.js';
@@ -19,6 +19,26 @@ const DEBUG_CAM = params.get('cam') === 'orbit' || params.get('debugcam') === '1
 // URL 파라미터가 없으면 절대 활성화되지 않음 → 퍼블리시 결과물의 시작 흐름에 영향 없음.
 const EMBED = params.get('embed') === '1';
 const SKIP_INTRO = EMBED || params.get('skipIntro') === '1';
+
+// v1.8: 입력 UI(조이스틱·터치 프롬프트) 판정. 렌더 품질 프로파일(isMobile, UA 기반)과 분리한다.
+// UA 문자열만 보면 iPadOS 13+ 가 Macintosh 로 보고돼 조이스틱이 안 생기고,
+// 키보드도 없으니 이동 수단이 아예 사라진다. `?touch=0|1` 로 강제 가능.
+function detectTouch() {
+  if (params.get('touch') === '1') return true;
+  if (params.get('touch') === '0') return false;
+  const mm = (q) => !!window.matchMedia?.(q).matches;
+  if (mm('(pointer: coarse)')) return true;
+  // 마우스/트랙패드가 전혀 없는데 터치 포인트가 있으면 터치 기기로 본다
+  return !mm('(any-pointer: fine)') && (navigator.maxTouchPoints || 0) > 0;
+}
+
+// v1.8: 소리 켜기(unmute)는 사용자 제스처 이후에만 허용한다. 음소거로 시작한 영상을
+// 제스처 없이 unmute 하면 브라우저가 재생을 멈춘다. 실제 흐름에서는 캐릭터 선택
+// 클릭이 항상 이 조건을 먼저 만족시킨다.
+let userActivated = false;
+const _markActivated = () => { userActivated = true; };
+window.addEventListener('pointerdown', _markActivated, { once: true, capture: true });
+window.addEventListener('keydown', _markActivated, { once: true, capture: true });
 
 const el = {
   canvas: document.getElementById('scene'),
@@ -161,6 +181,41 @@ function collectVideoUrls(project, ctx) {
   return urls;
 }
 
+// ---- 미디어 스크린 오디오 게이팅 (v1.8) ----------------------------------
+// "들리는가"는 muted 로, "얼마나 크게"는 volume 으로 제어한다.
+// muted 로 게이팅하는 이유: iOS Safari 는 video.volume 설정을 무시하므로(기기 물리
+// 볼륨만 유효) 볼륨만으로는 방 밖 무음이 보장되지 않는다 — v1.7.1 의 방 게이팅이
+// 아이폰/아이패드에서 통째로 무효였던 원인.
+//
+// state = { roomId, x, z, dt } · null 이면 전부 즉시 무음 (입장 전 · 일시정지 · 탭 비활성)
+// playerScreen = 풀스크린 플레이어가 직접 볼륨을 쥐고 있는 스크린 (있으면 건드리지 않음)
+
+// 페이드 시간(초). 들어갈 때는 부드럽게, 나갈 때는 빠르게 — 방을 나왔는데 소리가
+// 길게 끌리면 "방 밖에서 들린다"는 체감이 그대로 남는다.
+const VOL_FADE_IN = 0.35, VOL_FADE_OUT = 0.15;
+
+function applyScreenAudio(screens, state, playerScreen = null) {
+  for (const sc of screens) {
+    const v = sc.video;
+    if (!v) continue;
+    if (sc === playerScreen) { sc._vol = v.volume; continue; }
+    let target = 0;
+    if (state && state.roomId && state.roomId === sc.roomId) {
+      const d = Math.hypot(sc.center.x - state.x, sc.center.z - state.z);
+      target = Math.max(0, Math.min(1, 1 - (d - 4) / 12)) * (sc.userVol ?? 1);
+    }
+    const cur = sc._vol ?? 0;
+    // state 없음(강제 무음) 또는 dt 미지정(1회 호출) = 즉시 반영. dt === 0 은 "시간이 안 흘렀다"이므로 0.
+    const k = state?.dt == null ? 1 : Math.min(1, state.dt / (target > cur ? VOL_FADE_IN : VOL_FADE_OUT));
+    let vol = cur + (target - cur) * k;
+    if (vol < 0.004) vol = 0; // 지수 감쇠는 0에 닿지 않는다 — 꼬리를 끊어 확실히 무음으로
+    sc._vol = vol;
+    v.volume = vol;
+    const wantMuted = !(vol > 0.01 && userActivated);
+    if (v.muted !== wantMuted) v.muted = wantMuted;
+  }
+}
+
 // ---- 조명 ---------------------------------------------------------------
 function setupLights(scene, isMobile) {
   const hemi = new THREE.HemisphereLight(0xfff2dc, 0x3a2f28, 0.55);
@@ -211,6 +266,7 @@ function attachOrbit(camera, dom, target) {
 async function boot() {
   const isMobile = params.get('mobile') === '1' ||
     (params.get('mobile') !== '0' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
+  const isTouch = detectTouch();
 
   const renderer = new THREE.WebGLRenderer({ canvas: el.canvas, antialias: !isMobile, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
@@ -293,10 +349,9 @@ async function boot() {
     window.__museum.avatar = avatar;
     window.__museum.autowalk = autowalk;
     // P2(v1.4): 방 순간이동 — meta.allowTeleport(기본 on), 터치 환경은 상시 버튼
-    const coarse = params.get('touch') === '1' || !!window.matchMedia?.('(pointer: coarse)').matches;
     teleport = new Teleport(window.__museum, {
       enabled: project.meta?.allowTeleport !== false,
-      touchButton: isMobile || coarse,
+      touchButton: isMobile || isTouch,
     });
     window.__museum.teleport = teleport;
     // P4: 피날레 룸 — window.__museum 을 ctx 로 전달(리빌드 시 world/arts/project 참조 자동 갱신)
@@ -315,7 +370,7 @@ async function boot() {
     // 시작 화면 동안: 로비 스폰에서 타이틀월(북쪽)을 바라보는 오프닝 샷
     camera.position.set(layout.spawn.x, 1.5, layout.spawn.z);
     camera.lookAt(layout.spawn.x, 1.5, layout.spawn.z - 6);
-    hud = new HUD(project, { isMobile, onEnter: enterGallery });
+    hud = new HUD(project, { isMobile, isTouch, onEnter: enterGallery });
   }
 
   window.__museum = { scene, camera, renderer, project, layout, world, arts, ctx, controls, interactions, avatar, hud };
@@ -407,15 +462,21 @@ async function boot() {
   window.__museum.setPaused = (p) => {
     if (paused === !!p) return;
     paused = !!p;
-    if (!paused) { timer.update(); animate(); } // 재개: dt 리셋 후 루프 재시작
+    // v1.8: 루프가 멈추면 게이팅도 멈춘다 → 마지막 볼륨으로 소리가 남는다. 강제 무음.
+    if (paused) applyScreenAudio(world.screens || [], null);
+    else { timer.update(); animate(); } // 재개: dt 리셋 후 루프 재시작
   };
+  // 탭이 백그라운드로 가면 rAF 가 스로틀/정지되어 게이팅이 멈춘다 → 같은 이유로 강제 무음
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) applyScreenAudio(world.screens || [], null);
+  });
   function animate() {
     if (paused) return;
     requestAnimationFrame(animate);
     timer.update();
     const dt = Math.min(timer.getDelta(), 0.05);
-    // F1(v1.7): 입장 전(시작 화면)에는 스크린 영상 소리를 내지 않는다 (입장 후 거리 감쇠로 복귀)
-    if (!controls) for (const sc of (world.screens || [])) { if (sc.video) sc.video.volume = 0; }
+    // 입장 전(시작 화면)·3D 편집 모드에는 스크린 영상 소리를 내지 않는다
+    if (!controls) applyScreenAudio(world.screens || [], null);
     if (editMode) {
       editMode.update(dt);
     } else if (controls) {
@@ -425,17 +486,15 @@ async function boot() {
       if (seating) seating.update();
       const ci = currentRoomIndex(controls.pos, layout);
       if (finale) finale.update(dt, ci);
-      // F1(v1.7.1): 스크린 영상 소리는 **그 미디어 방에 들어가야만** 재생 —
-      // 방 밖(다른 방·복도)에서는 무음. 방 안에서는 사용자 볼륨 × 거리 감쇠.
-      // 풀스크린 플레이어가 열려 있으면 플레이어(사용자 볼륨)가 직접 제어.
-      if (!seating?.playerOpen) {
-        for (const sc of (world.screens || [])) {
-          if (!sc.video || sc.video.muted) continue;
-          const inRoom = ci >= 0 && layout.rooms[ci]?.id === sc.roomId;
-          if (!inRoom) { sc.video.volume = 0; continue; }
-          const d = Math.hypot(sc.center.x - controls.pos.x, sc.center.z - controls.pos.y);
-          sc.video.volume = Math.max(0, Math.min(1, 1 - (d - 4) / 12)) * (sc.userVol ?? 1);
-        }
+      // v1.8: 스크린 소리는 그 미디어 방 안에서만. muted 기준 게이팅 → iOS 포함 전 플랫폼 동작.
+      applyScreenAudio(world.screens || [], {
+        roomId: ci >= 0 ? layout.rooms[ci]?.id : null,
+        x: controls.pos.x, z: controls.pos.y, dt,
+      }, seating?.playerOpen ? seating.activeScreen : null);
+      // v1.8: 아바타를 현재 방 밝기에 맞춘다 (어두운 방에서 아바타만 밝게 뜨던 문제)
+      if (avatar?.userData.setDim) {
+        const space = ci >= 0 ? project.rooms[ci] : project.lobby;
+        avatar.userData.setDim(roomDim(space?.ceiling));
       }
       // 라이트 매니저: 모바일은 현재 룸의 조명만 활성(§5.8)
       if (isMobile && (arts.spots.length || world.moodLights.length)) {
